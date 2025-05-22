@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar_admin.php';
 
 // Total Orders
-$totalOrders = $pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
+$totalOrders = $pdo->query('SELECT COUNT(*) FROM orders')->fetchColumn();
 
 // Orders Per Day (Last 7 Days)
 $chartLabels = [];
@@ -15,66 +15,99 @@ $chartData = [];
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-$i days"));
     $chartLabels[] = date('M d', strtotime($date));
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE DATE(order_date) = ?");
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE DATE(order_date) = ?');
     $stmt->execute([$date]);
     $chartData[] = $stmt->fetchColumn();
 }
 
 // Low Stock Items
-$lowStockItems = $pdo->query("
+$lowStockItems = $pdo
+    ->query(
+        "
     SELECT item_name, quantity, reorder_level 
     FROM inventory 
     WHERE quantity <= reorder_level 
     ORDER BY quantity ASC 
     LIMIT 5
-")->fetchAll(PDO::FETCH_ASSOC);
+"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 // Status Breakdown
 $statusLabels = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
 $statusCounts = [];
 foreach ($statusLabels as $status) {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status = ?");
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE status = ?');
     $stmt->execute([$status]);
     $statusCounts[] = $stmt->fetchColumn();
 }
 
 // Top Services
+<<<<<<< HEAD
 $topServices = $pdo->query("
     SELECT p.product_name AS service_name, COUNT(*) AS total_orders
     FROM order_details od
     JOIN products p ON od.product_id = p.product_id
     GROUP BY p.product_id
+=======
+$topServices = $pdo
+    ->query(
+        "
+    SELECT s.service_name, COUNT(s.service_id) as total_orders
+    FROM services s 
+    LEFT JOIN (
+        SELECT service_id, COUNT(*) as usage_count
+        FROM services
+        GROUP BY service_id
+    ) as service_usage ON s.service_id = service_usage.service_id
+    GROUP BY s.service_name
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
     ORDER BY total_orders DESC
     LIMIT 5
-")->fetchAll(PDO::FETCH_ASSOC);
+"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 // Orders per Branch
-$branchOrders = $pdo->query("
+$branchOrders = $pdo
+    ->query(
+        "
     SELECT b.branch_name, COUNT(o.order_id) AS total_orders
     FROM branches b
     LEFT JOIN orders o ON o.branch_id = b.branch_id
     GROUP BY b.branch_id
-")->fetchAll(PDO::FETCH_ASSOC);
+"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 // Recent Orders
-$recentOrders = $pdo->query("
+$recentOrders = $pdo
+    ->query(
+        "
     SELECT o.order_id, u.full_name, o.total_price, o.status, o.order_date
     FROM orders o
     JOIN users u ON o.user_id = u.user_id
     ORDER BY o.order_date DESC
     LIMIT 5
-")->fetchAll(PDO::FETCH_ASSOC);
+"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 // Order Timeline
-$orderTimelines = $pdo->query("
+$orderTimelines = $pdo
+    ->query(
+        "
     SELECT o.order_id, u.full_name, o.order_date, o.expected_completion
     FROM orders o
     JOIN users u ON o.user_id = u.user_id
     ORDER BY o.order_date DESC
     LIMIT 5
-")->fetchAll(PDO::FETCH_ASSOC);
+"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 // Totals
+<<<<<<< HEAD
 $totalEmployees = $pdo->query("
     SELECT COUNT(*) 
     FROM employees e
@@ -82,6 +115,10 @@ $totalEmployees = $pdo->query("
     WHERE s.status_name = 'Active'
 ")->fetchColumn();
 $totalInventory = $pdo->query("SELECT COUNT(*) FROM inventory")->fetchColumn();
+=======
+$totalEmployees = $pdo->query('SELECT COUNT(*) FROM employees')->fetchColumn();
+$totalInventory = $pdo->query('SELECT COUNT(*) FROM inventory')->fetchColumn();
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
 $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'Completed'")->fetchColumn() ?: 0;
 ?>
 
@@ -93,10 +130,20 @@ $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'C
     <h1 class="dashboard-heading">Welcome, <?= htmlspecialchars($_SESSION['full_name']) ?> <span class="dashboard-role">(Admin)</span></h1>
 
     <section class="dashboard-cards">
+<<<<<<< HEAD
       <div class="card card-blue"><div class="card-content"><h3>Total Orders</h3><p><?= $totalOrders ?></p></div></div>
       <div class="card card-green"><div class="card-content"><h3>Inventory Items</h3><p><?= $totalInventory ?></p></div></div>
       <div class="card card-yellow"><div class="card-content"><h3>Total Sales</h3><p>₱<?= number_format($totalSales, 2) ?></p></div></div>
       <div class="card card-red"><div class="card-content"><h3>Active Employees</h3><p><?= $totalEmployees ?></p></div></div>
+=======
+      <div class="card card-blue"><div class="card-content"><div class="card-text"><h3>Total Orders</h3><p><?= $totalOrders ?></p></div><div class="card-icon"><i class="fa-solid fa-cart-shopping"></i></div></div></div>
+      <div class="card card-green"><div class="card-content"><div class="card-text"><h3>Inventory Items</h3><p><?= $totalInventory ?></p></div><div class="card-icon"><i class="fa-solid fa-boxes-stacked"></i></div></div></div>
+      <div class="card card-yellow"><div class="card-content"><div class="card-text"><h3>Total Sales</h3><p>₱<?= number_format(
+          $totalSales,
+          2
+      ) ?></p></div><div class="card-icon"><i class="fa-solid fa-peso-sign"></i></div></div></div>
+      <div class="card card-red"><div class="card-content"><div class="card-text"><h3>Active Employees</h3><p><?= $totalEmployees ?></p></div><div class="card-icon"><i class="fa-solid fa-users"></i></div></div></div>
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
     </section>
 
     <section class="chart-grid">
@@ -111,7 +158,13 @@ $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'C
         <h2>⚠️ Low Stock Items</h2>
         <ul>
           <?php foreach ($lowStockItems as $item): ?>
+<<<<<<< HEAD
             <li><?= htmlspecialchars($item['item_name']) ?> — <strong><?= $item['quantity'] ?></strong> (Limit: <?= $item['reorder_level'] ?>)</li>
+=======
+            <li><?= htmlspecialchars($item['item_name']) ?> — <strong><?= $item[
+     'quantity'
+ ] ?></strong> left <span style="color:red;">🔴</span></li>
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
           <?php endforeach; ?>
         </ul>
       </div>
@@ -121,8 +174,19 @@ $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'C
         <ul>
           <?php foreach ($orderTimelines as $row): ?>
             <li>
+<<<<<<< HEAD
               <strong>#<?= $row['order_id'] ?> <?= htmlspecialchars($row['full_name']) ?></strong><br>
               <small><?= date('M d', strtotime($row['order_date'])) ?> → <?= date('M d', strtotime($row['expected_completion'])) ?></small>
+=======
+              <div class="timeline-header">
+                <strong>#<?= $row['order_id'] ?> - <?= $row['full_name'] ?></strong>
+                <span><?= date('M d', strtotime($row['order_date'])) ?> → <?= date(
+     'M d',
+     strtotime($row['expected_completion'])
+ ) ?></span>
+              </div>
+              <div class="timeline-bar"><div class="timeline-fill" style="width: 100%;"></div></div>
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
             </li>
           <?php endforeach; ?>
         </ul>
@@ -200,6 +264,7 @@ new Chart(document.getElementById('branchChart'), {
 </script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<<<<<<< HEAD
 
 <style>
 /* Base Container Styling */
@@ -350,3 +415,5 @@ tbody tr:nth-child(even) {
 </style>
 
 </style>
+=======
+>>>>>>> 260fd405dc3f873dd238096f8d52098d11255520
