@@ -43,196 +43,14 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inspection History - Senior Tailor</title>
     <!-- Enhanced sidebar functionality -->
-    <link rel="stylesheet" href="/public/assets/css/enhanced-sidebar.css">
-    <script src="/public/assets/js/enhanced-sidebar.js"></script>
+   
+      <link rel="stylesheet" href="../public/assets/css/enhanced-sidebar.css">
+    <script src="../public/assets/js/enhanced-sidebar.js"></script>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .page-title {
-            font-size: 1.75rem;
-            font-weight: 600;
-            margin-bottom: 0;
-        }
-        
-        .page-subtitle {
-            color: #6c757d;
-            font-size: 0.9rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .search-bar {
-            position: relative;
-        }
-        
-        .search-bar i {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6c757d;
-        }
-        
-        .search-input {
-            padding-left: 35px;
-        }
-        
-        .filter-section {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .filter-btn {
-            font-size: 0.875rem;
-            padding: 0.375rem 0.75rem;
-        }
-        
-        .filter-btn.active {
-            background-color: #0d1b2a;
-            color: white;
-            border-color: #0d1b2a;
-        }
-        
-        .date-picker-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .view-toggle-btn {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #0d1b2a;
-            color: white;
-            border: none;
-            border-radius: 0.25rem;
-        }
-        
-        .export-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .section-header {
-            margin: 1.5rem 0 1rem;
-        }
-        
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin: 0;
-        }
-        
-        .section-subtitle {
-            color: #6c757d;
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-        }
-        
-        .inspection-card {
-            border-radius: 0.5rem;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            height: 100%;
-            position: relative;
-        }
-        
-        .card-image {
-            height: 200px;
-            background-color: #e9ecef;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .card-image-icon {
-            width: 40px;
-            height: 40px;
-            background-color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #adb5bd;
-        }
-        
-        .status-badge {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            padding: 0.35rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        
-        .status-passed {
-            background-color: #d1e7dd;
-            color: #198754;
-        }
-        
-        .status-failed {
-            background-color: #f8d7da;
-            color: #dc3545;
-        }
-        
-        .status-rework {
-            background-color: #fff3cd;
-            color: #ffc107;
-        }
-        
-        .card-content {
-            padding: 1rem;
-            background-color: white;
-        }
-        
-        .card-id {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .card-garment {
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .card-date {
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        
-        .view-icon {
-            color: #6c757d;
-            cursor: pointer;
-        }
-        
-        .view-icon:hover {
-            color: #0d1b2a;
-        }    </style>
+ 
 </head>
 <body>
     <div class="main-content">
@@ -380,3 +198,239 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+<style>/* Main Layout */
+.main-content {
+    padding: 2rem;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+/* Page Header */
+.page-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+    font-size: 1rem;
+    color: #6c757d;
+    margin-bottom: 2rem;
+}
+
+/* Search and Filters */
+.search-bar {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.search-bar i {
+    position: absolute;
+    left: 15px;
+    top: 12px;
+    color: #6c757d;
+}
+
+.search-input {
+    padding-left: 40px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+    height: 45px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+}
+
+.search-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    border-color: #86b7fe;
+}
+
+.filter-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-btn, .date-picker-btn {
+    border-radius: 8px;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    background-color: white;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s;
+}
+
+.filter-btn.active {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.filter-btn:hover, .date-picker-btn:hover {
+    background-color: #f1f3f5;
+}
+
+.view-toggle-btn {
+    border-radius: 8px 0 0 8px;
+    background-color: #0d6efd;
+    color: white;
+    border: 1px solid #0d6efd;
+    padding: 0.375rem 0.75rem;
+}
+
+.export-btn {
+    border-radius: 8px;
+    padding: 0.375rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: white;
+    transition: all 0.2s;
+}
+
+.export-btn:hover {
+    background-color: #f1f3f5;
+}
+
+/* Section Header */
+.section-header {
+    margin: 1.5rem 0;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.section-subtitle {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 1.25rem;
+}
+
+/* Inspection Cards */
+.inspection-card {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    border: 1px solid #f0f0f0;
+    height: 100%;
+}
+
+.inspection-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0,0,0,0.1);
+}
+
+.card-image {
+    background-color: #f8f9fa;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.card-image-icon {
+    font-size: 2rem;
+    color: #6c757d;
+}
+
+.status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-passed {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.status-failed {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.status-rework {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.card-content {
+    padding: 1rem;
+}
+
+.card-id {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.card-id span {
+    font-weight: 600;
+    color: #495057;
+}
+
+.view-icon {
+    color: #6c757d;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.view-icon:hover {
+    color: #0d6efd;
+}
+
+.card-garment {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 8px;
+}
+
+.card-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .filter-section {
+        margin-bottom: 1rem;
+    }
+    
+    .inspection-card {
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .filter-section, .btn-group, .export-btn {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .card-image {
+        height: 80px;
+    }
+}
+</style>

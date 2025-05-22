@@ -23,14 +23,8 @@ try {
     $positionStmt = $pdo->prepare($positionSql);
     $positionStmt->execute([$user_id]);
     $positionData = $positionStmt->fetch();
-    $positionName = $positionData ? $positionData['position_name'] : '';
-
-    // Load appropriate sidebar based on position
-    if ($positionName === 'Senior Tailor') {
-        require_once '../../includes/sidebar_senior_tailor.php';
-    } else {
-        require_once '../../includes/sidebar_employee.php';
-    }
+    $positionName = $positionData ? $positionData['position_name'] : ''; // Load employee sidebar (now handles position-specific menus)
+    require_once '../../includes/sidebar_employee.php';
 } catch (PDOException $e) {
     // Default to employee sidebar if there's an error
     require_once '../../includes/sidebar_employee.php';

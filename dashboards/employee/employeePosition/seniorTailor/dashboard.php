@@ -44,321 +44,9 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QC Dashboard - Senior Tailor</title>
-    <link rel="stylesheet" href="/public/assets/css/enhanced-sidebar.css">
-    <script src="/public/assets/js/enhanced-sidebar.js"></script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-            background-color: #f5f7fa;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        h1 {
-            font-size: 28px;
-            font-weight: 600;
-            margin: 0;
-            color: #333;
-        }
-        
-        .date {
-            color: #666;
-            font-size: 16px;
-            margin-top: 5px;
-        }
-        
-        .status-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .card {
-            background-color: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-        }
-        
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 0 0 5px 0;
-        }
-        
-        .card-subtitle {
-            color: #666;
-            font-size: 14px;
-            margin: 0 0 15px 0;
-        }
-        
-        .metric {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .metric-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .icon-passed {
-            background-color: #dcfce7;
-            color: #16a34a;
-        }
-        
-        .icon-failed {
-            background-color: #fee2e2;
-            color: #dc2626;
-        }
-        
-        .icon-pending {
-            background-color: #dbeafe;
-            color: #2563eb;
-        }
-        
-        .metric-value {
-            font-size: 24px;
-            font-weight: 600;
-        }
-        
-        .metric-label {
-            font-size: 14px;
-            color: #666;
-        }
-        
-        .next-item {
-            background-color: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0 0 20px 0;
-        }
-        
-        .item-details {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        .item-image {
-            width: 100px;
-            height: 100px;
-            background-color: #f0f0f0;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #999;
-        }
-        
-        .item-info {
-            flex: 1;
-        }
-        
-        .item-id {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 0 0 5px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .order-number {
-            font-size: 12px;
-            color: #2563eb;
-            font-weight: normal;
-        }
-        
-        .item-name {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0 0 10px 0;
-        }
-        
-        .item-meta {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .priority-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background-color: #fff7ed;
-            color: #c2410c;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-            margin-top: 5px;
-        }
-        
-        .action-button {
-            background-color: #111827;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .action-button:hover {
-            background-color: #1f2937;
-        }
-        
-        .bottom-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        
-        .performance-card, .activity-card {
-            background-color: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-        }
-        
-        .performance-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0 0 5px 0;
-        }
-        
-        .performance-subtitle {
-            color: #666;
-            font-size: 14px;
-            margin: 0 0 20px 0;
-        }
-        
-        .progress-item {
-            margin-bottom: 15px;
-        }
-        
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-        
-        .progress-bar {
-            height: 8px;
-            background-color: #e5e7eb;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .progress-value {
-            height: 100%;
-            border-radius: 4px;
-        }
-        
-        .progress-inspection {
-            background-color: #3b82f6;
-        }
-        
-        .progress-pass {
-            background-color: #10b981;
-        }
-        
-        .progress-accuracy {
-            background-color: #111827;
-        }
-        
-        .activity-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .activity-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-        }
-        
-        .activity-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .activity-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .activity-details {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .activity-id {
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        .activity-name {
-            color: #666;
-            font-size: 13px;
-        }
-        
-        .activity-time {
-            font-size: 13px;
-            color: #666;
-        }
-        
-        @media (max-width: 768px) {
-            .item-details {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .item-image {
-                width: 100%;
-                height: 150px;
-            }
-        }    </style>
+    <link rel="stylesheet" href="../public/assets/css/enhanced-sidebar.css">
+    <script src="../public/assets/js/enhanced-sidebar.js"></script>
+  
 </head>
 <body>
     <div class="main-content">
@@ -571,3 +259,393 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     </div>
 </body>
 </html>
+ <style>
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .main-content {
+            padding: 1.5rem;
+            transition: margin-left 0.3s ease;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #333;
+        }
+        
+        .date {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+        
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            background-color: #4e73df;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .card-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+            color: #333;
+        }
+        
+        .card-subtitle {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-bottom: 1.2rem;
+        }
+        
+        .metric {
+            display: flex;
+            align-items: center;
+        }
+        
+        .metric-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+        }
+        
+        .icon-passed {
+            background-color: rgba(40, 167, 69, 0.15);
+            color: #28a745;
+        }
+        
+        .icon-failed {
+            background-color: rgba(220, 53, 69, 0.15);
+            color: #dc3545;
+        }
+        
+        .icon-pending {
+            background-color: rgba(255, 193, 7, 0.15);
+            color: #ffc107;
+        }
+        
+        .metric-value {
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: #333;
+        }
+        
+        .metric-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .section-title {
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .next-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        
+        .item-details {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .item-image {
+            width: 64px;
+            height: 64px;
+            background-color: #f1f1f1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            color: #6c757d;
+        }
+        
+        .item-info {
+            flex-grow: 1;
+            padding-right: 1rem;
+        }
+        
+        .item-id {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .order-number {
+            font-weight: normal;
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-left: 0.8rem;
+        }
+        
+        .item-name {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: #333;
+        }
+        
+        .item-meta {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .priority-tag {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            padding: 0.3rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        
+        .priority-tag svg {
+            margin-right: 0.3rem;
+        }
+        
+        .action-button {
+            background: #4e73df;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .action-button:hover {
+            background: #375bcc;
+        }
+        
+        .action-button svg {
+            margin-left: 0.5rem;
+        }
+        
+        .bottom-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .performance-card, .activity-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        
+        .performance-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+            color: #333;
+        }
+        
+        .performance-subtitle {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-item {
+            margin-bottom: 1.2rem;
+        }
+        
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-value {
+            height: 100%;
+            border-radius: 4px;
+        }
+        
+        .progress-inspection {
+            background: #4e73df;
+        }
+        
+        .progress-pass {
+            background: #28a745;
+        }
+        
+        .progress-accuracy {
+            background: #17a2b8;
+        }
+        
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .activity-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem 0;
+            border-bottom: 1px solid #f1f1f1;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+        }
+        
+        .activity-details {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .activity-id {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        
+        .activity-name {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .activity-time {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .chart-container {
+            height: 180px;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .item-details {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .item-info {
+                margin-bottom: 1rem;
+                padding-right: 0;
+            }
+            
+            .action-button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        /* Animation effects */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card, .next-item, .performance-card, .activity-card {
+            animation: fadeIn 0.5s ease forwards;
+        }
+        
+        .status-cards .card:nth-child(1) { animation-delay: 0.1s; }
+        .status-cards .card:nth-child(2) { animation-delay: 0.2s; }
+        .status-cards .card:nth-child(3) { animation-delay: 0.3s; }
+        
+        .next-item { animation-delay: 0.4s; }
+        .performance-card { animation-delay: 0.5s; }
+        .activity-card { animation-delay: 0.6s; }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+  
