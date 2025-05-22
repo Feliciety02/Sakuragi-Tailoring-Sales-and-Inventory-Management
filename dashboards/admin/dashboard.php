@@ -40,9 +40,10 @@ foreach ($statusLabels as $status) {
 
 // Top Services
 $topServices = $pdo->query("
-    SELECT service_name, COUNT(*) as total_orders
-    FROM orders
-    GROUP BY service_name
+    SELECT p.product_name AS service_name, COUNT(*) AS total_orders
+    FROM order_details od
+    JOIN products p ON od.product_id = p.product_id
+    GROUP BY p.product_id
     ORDER BY total_orders DESC
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -74,7 +75,12 @@ $orderTimelines = $pdo->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // Totals
-$totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Active'")->fetchColumn();
+$totalEmployees = $pdo->query("
+    SELECT COUNT(*) 
+    FROM employees e
+    JOIN statuses s ON e.status_id = s.status_id
+    WHERE s.status_name = 'Active'
+")->fetchColumn();
 $totalInventory = $pdo->query("SELECT COUNT(*) FROM inventory")->fetchColumn();
 $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'Completed'")->fetchColumn() ?: 0;
 ?>
@@ -84,42 +90,39 @@ $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'C
 
 <main class="main-content admin-dashboard">
   <div class="dashboard-container">
-    <h1>Welcome, <?= $_SESSION['full_name'] ?> (Admin)</h1>
+    <h1 class="dashboard-heading">Welcome, <?= htmlspecialchars($_SESSION['full_name']) ?> <span class="dashboard-role">(Admin)</span></h1>
 
     <section class="dashboard-cards">
-      <div class="card card-blue"><div class="card-content"><div class="card-text"><h3>Total Orders</h3><p><?= $totalOrders ?></p></div><div class="card-icon"><i class="fa-solid fa-cart-shopping"></i></div></div></div>
-      <div class="card card-green"><div class="card-content"><div class="card-text"><h3>Inventory Items</h3><p><?= $totalInventory ?></p></div><div class="card-icon"><i class="fa-solid fa-boxes-stacked"></i></div></div></div>
-      <div class="card card-yellow"><div class="card-content"><div class="card-text"><h3>Total Sales</h3><p>₱<?= number_format($totalSales, 2) ?></p></div><div class="card-icon"><i class="fa-solid fa-peso-sign"></i></div></div></div>
-      <div class="card card-red"><div class="card-content"><div class="card-text"><h3>Active Employees</h3><p><?= $totalEmployees ?></p></div><div class="card-icon"><i class="fa-solid fa-users"></i></div></div></div>
+      <div class="card card-blue"><div class="card-content"><h3>Total Orders</h3><p><?= $totalOrders ?></p></div></div>
+      <div class="card card-green"><div class="card-content"><h3>Inventory Items</h3><p><?= $totalInventory ?></p></div></div>
+      <div class="card card-yellow"><div class="card-content"><h3>Total Sales</h3><p>₱<?= number_format($totalSales, 2) ?></p></div></div>
+      <div class="card card-red"><div class="card-content"><h3>Active Employees</h3><p><?= $totalEmployees ?></p></div></div>
     </section>
 
-    <section class="chart-grid-2x2">
+    <section class="chart-grid">
       <div class="chart-card"><h2>📈 Orders (7 Days)</h2><canvas id="ordersChart"></canvas></div>
-      <div class="chart-card"><h2>📊 Status</h2><canvas id="statusChart"></canvas></div>
+      <div class="chart-card"><h2>📊 Order Status</h2><canvas id="statusChart"></canvas></div>
       <div class="chart-card"><h2>🏆 Top Services</h2><canvas id="topServicesChart"></canvas></div>
-      <div class="chart-card"><h2>📍 By Branch</h2><canvas id="branchChart"></canvas></div>
+      <div class="chart-card"><h2>📍 Orders by Branch</h2><canvas id="branchChart"></canvas></div>
     </section>
 
-    <section class="dashboard-bottom-section">
+    <section class="dashboard-bottom">
       <div class="low-stock">
-        <h2>⚠️ Low Stock</h2>
+        <h2>⚠️ Low Stock Items</h2>
         <ul>
           <?php foreach ($lowStockItems as $item): ?>
-            <li><?= htmlspecialchars($item['item_name']) ?> — <strong><?= $item['quantity'] ?></strong> left <span style="color:red;">🔴</span></li>
+            <li><?= htmlspecialchars($item['item_name']) ?> — <strong><?= $item['quantity'] ?></strong> (Limit: <?= $item['reorder_level'] ?>)</li>
           <?php endforeach; ?>
         </ul>
       </div>
 
-      <div class="timeline-chart">
-        <h2>🗓️ Order Timelines</h2>
-        <ul class="timeline-list">
+      <div class="order-timeline">
+        <h2>🗓️ Order Timeline</h2>
+        <ul>
           <?php foreach ($orderTimelines as $row): ?>
             <li>
-              <div class="timeline-header">
-                <strong>#<?= $row['order_id'] ?> - <?= $row['full_name'] ?></strong>
-                <span><?= date('M d', strtotime($row['order_date'])) ?> → <?= date('M d', strtotime($row['expected_completion'])) ?></span>
-              </div>
-              <div class="timeline-bar"><div class="timeline-fill" style="width: 100%;"></div></div>
+              <strong>#<?= $row['order_id'] ?> <?= htmlspecialchars($row['full_name']) ?></strong><br>
+              <small><?= date('M d', strtotime($row['order_date'])) ?> → <?= date('M d', strtotime($row['expected_completion'])) ?></small>
             </li>
           <?php endforeach; ?>
         </ul>
@@ -135,7 +138,7 @@ $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'C
             <tr>
               <td>#<?= $order['order_id'] ?></td>
               <td><?= htmlspecialchars($order['full_name']) ?></td>
-              <td><span class="badge status-<?= strtolower($order['status']) ?>"><?= $order['status'] ?></span></td>
+              <td><span class="badge <?= strtolower($order['status']) ?>"><?= $order['status'] ?></span></td>
               <td>₱<?= number_format($order['total_price'], 2) ?></td>
               <td><?= date('M d, Y', strtotime($order['order_date'])) ?></td>
             </tr>
@@ -157,7 +160,7 @@ new Chart(document.getElementById('ordersChart'), {
       backgroundColor: 'rgba(0, 123, 255, 0.2)',
       borderColor: '#007bff',
       fill: true,
-      tension: 0.3
+      tension: 0.4
     }]
   }
 });
@@ -197,3 +200,153 @@ new Chart(document.getElementById('branchChart'), {
 </script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+
+<style>
+/* Base Container Styling */
+.admin-dashboard {
+  padding: 2rem;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f5f7fa;
+}
+
+/* Page Title */
+.dashboard-heading {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+.dashboard-role {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* Dashboard Cards */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.card {
+  border-radius: 10px;
+  padding: 1rem;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+}
+.card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+.card p {
+  font-size: 1.6rem;
+  font-weight: bold;
+  margin: 0;
+}
+.card-blue { background: #007bff; }
+.card-green { background: #28a745; }
+.card-yellow { background: #ffc107; color: #212529; }
+.card-red { background: #dc3545; }
+
+/* Chart Grid */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.chart-card {
+  background: white;
+  padding: 1.2rem;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 320px;
+}
+.chart-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.chart-card canvas {
+  flex-grow: 1;
+  max-height: 260px;
+}
+
+/* Dashboard Sections */
+.dashboard-bottom,
+.recent-orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+.low-stock, .order-timeline {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.low-stock h2, .order-timeline h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+.low-stock ul, .order-timeline ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+.low-stock li, .order-timeline li {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Table Styles */
+.recent-orders h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+thead {
+  background: #f1f1f1;
+}
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Status Badges */
+.badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 5px;
+  color: #fff;
+  text-transform: capitalize;
+}
+.badge.pending { background-color: #f1c40f; color: #212529; }
+.badge.in-progress { background-color: #3498db; }
+.badge.completed { background-color: #2ecc71; }
+.badge.cancelled { background-color: #e74c3c; }
+</style>
+
+</style>

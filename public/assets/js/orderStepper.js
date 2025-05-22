@@ -123,26 +123,47 @@ function validateStep2() {
 
 
 // -------- STEP 3: CUSTOMIZE --------
-function setupStep3() {
-    const custom = document.getElementById('customizable')?.checked;
-    const standard = document.getElementById('standard')?.checked;
 
-    if (custom || standard) setNextButtonState(true);
-    else setNextButtonState(false);
+// Setup logic when Step 3 is activated
+function setupStep3() {
+    const isCustom = document.getElementById('customizable')?.checked;
+    const isStandard = document.getElementById('standard')?.checked;
+
+    if (isCustom) {
+        const hasCustomData = document.getElementById('customizableTableData')?.value.length > 0;
+        setNextButtonState(hasCustomData);
+    } else if (isStandard) {
+        updateStandardValidation(); // will internally call setNextButtonState
+    } else {
+        setNextButtonState(false);
+    }
 }
+
+// Validation logic before moving to Step 4
 function validateStep3() {
     const isCustom = document.getElementById('customizable')?.checked;
     const isStandard = document.getElementById('standard')?.checked;
 
     if (!isCustom && !isStandard) return false;
 
-    if (isStandard) {
-        const rows = document.querySelectorAll('#manualTableBody tr');
-        return rows.length > 0;
+    if (isCustom) {
+        const customData = document.getElementById('customizableTableData')?.value;
+        return customData && customData.length > 0;
     }
 
-    return true;
+    if (isStandard) {
+        const rows = document.querySelectorAll('#manualTableBody tr');
+        let valid = false;
+        rows.forEach(row => {
+            const qty = parseInt(row.querySelector('input[name="quantity[]"]').value) || 0;
+            if (qty > 0) valid = true;
+        });
+        return valid;
+    }
+
+    return false;
 }
+
 
 // -------- STEP 4: SUMMARY --------
 function setupStep4() {

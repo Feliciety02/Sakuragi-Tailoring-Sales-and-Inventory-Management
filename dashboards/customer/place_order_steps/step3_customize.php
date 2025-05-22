@@ -125,227 +125,280 @@ if ($serviceId) {
     line-height: 1;
 }
 </style>
-
-<!-- JS (No Blob, uses hidden input) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
+function setNextButtonState(enabled) {
+  const btn = document.getElementById('nextBtn');
+  if (!btn) return;
+  btn.disabled = !enabled;
+  btn.classList.toggle('btn-primary', enabled);
+  btn.classList.toggle('btn-secondary', !enabled);
+}
+
+function checkNextButtonCondition() {
+  const isCustom = document.getElementById('customizable')?.checked;
+  const isStandard = document.getElementById('standard')?.checked;
+
+  if (isCustom) {
+    const customData = document.getElementById('customizableTableData')?.value;
+    setNextButtonState(customData && customData.length > 0);
+  } else if (isStandard) {
+    const standardData = document.getElementById('standardTableData')?.value;
+    setNextButtonState(standardData && JSON.parse(standardData).length > 0);
+  } else {
+    setNextButtonState(false);
+  }
+}
+
 function selectDesignType(type, el) {
-    document.getElementById('customizableSection').classList.toggle('d-none', type !== 'customizable');
-    document.getElementById('nonCustomizableSection').classList.toggle('d-none', type !== 'standard');
+  document.getElementById('customizableSection').classList.toggle('d-none', type !== 'customizable');
+  document.getElementById('nonCustomizableSection').classList.toggle('d-none', type !== 'standard');
+  document.querySelectorAll('.design-type-card').forEach(card => card.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById(type).checked = true;
 
-    document.querySelectorAll('.design-type-card').forEach(card => card.classList.remove('selected'));
-    el.classList.add('selected');
-    document.getElementById(type).checked = true;
-
-    sessionStorage.removeItem('uploadedDesignList');
+  if (type === 'customizable') {
+    sessionStorage.removeItem('standardDesignExcel');
     document.getElementById('standardTableData').value = '';
-    disableNextButton();
+  } else {
+    sessionStorage.removeItem('uploadedDesignList');
+    document.getElementById('customizableTableData').value = '';
+  }
+
+  checkNextButtonCondition();
 }
 
 function handleExcelUpload() {
-    const file = document.getElementById('excelFile').files[0];
-    if (!file) return;
+  const file = document.getElementById('excelFile').files[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        renderExcelTable(json);
-        sessionStorage.setItem('uploadedDesignList', JSON.stringify(json));
-        document.getElementById('excelActions').classList.remove('d-none');
-        enableNextButton();
-    };
-    reader.readAsArrayBuffer(file);
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    renderExcelTable(json);
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function renderExcelTable(json) {
-    const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
-    const unitPrice = selectedService?.price || 0;
+  const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
+  const unitPrice = selectedService?.price || 0;
+  const headers = json[0];
 
-    const headers = json[0]; // First row = header
-    const sizeIndex = headers.findIndex(h => h.toLowerCase().includes('size'));
-    const qtyIndex = headers.findIndex(h => h.toLowerCase().includes('quantity') || h.toLowerCase().includes('number'));
+  const sizeIndex = headers.findIndex(h => h.toLowerCase().includes('size'));
+  const qtyIndex = headers.findIndex(h => h.toLowerCase().includes('quantity') || h.toLowerCase().includes('number'));
 
-    if (sizeIndex === -1 || qtyIndex === -1) {
-        document.getElementById('excelPreview').innerHTML = `<div class="alert alert-warning">Missing "Size" or "Quantity/Number" column in uploaded file.</div>`;
-        disableNextButton();
-        return;
-    }
+  if (sizeIndex === -1 || qtyIndex === -1) {
+    document.getElementById('excelPreview').innerHTML = `<div class='alert alert-warning'>Missing "Size" or "Quantity/Number" column.</div>`;
+    setNextButtonState(false);
+    return;
+  }
 
-    let dataRows = [];
-    let html = `
-      <table class="table table-bordered align-middle">
-        <thead class="table-primary text-white">
-          <tr>
-            <th>Size</th>
-            <th>Quantity</th>
-            <th>Cost</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="customExcelBody">
-    `;
+  let html = `<table class='table table-bordered align-middle'><thead><tr>`;
+  headers.forEach(h => html += `<th>${h}</th>`);
+  html += `<th>Cost</th><th>Action</th></tr></thead><tbody>`;
 
-    for (let i = 1; i < json.length; i++) {
-        const row = json[i];
-        const size = row[sizeIndex]?.trim();
-        const quantity = parseInt(row[qtyIndex]) || 0;
-        if (!size || quantity <= 0) continue;
+  const dataRows = [];
 
-        const cost = quantity * unitPrice;
+  for (let i = 1; i < json.length; i++) {
+    const row = json[i];
+    if (!row || !row[sizeIndex] || !row[qtyIndex]) continue;
 
-        html += `
-          <tr>
-            <td>${size}</td>
-            <td>${quantity}</td>
-            <td class="cost-cell">₱${cost.toFixed(2)}</td>
-            <td><button class="btn btn-outline-danger btn-sm" onclick="removeExcelRow(this)">Remove</button></td>
-          </tr>
-        `;
+    const size = row[sizeIndex]?.trim();
+    const quantity = parseInt(row[qtyIndex]) || 0;
+    if (!size || quantity <= 0) continue;
 
-        dataRows.push({ size, quantity, cost });
-    }
+    const cost = quantity * unitPrice;
 
-    const totalQty = dataRows.reduce((sum, row) => sum + row.quantity, 0);
-    const freeShirts = Math.floor(totalQty / 12);
-
-    html += `
-        </tbody>
-      </table>
-      <p class="mt-3 text-success">
-        🎁 Eligible for <strong>${freeShirts}</strong> free shirt(s) (1 free every 12 ordered).
-      </p>
-    `;
-
-    // Store in preview + hidden input
-    document.getElementById('excelPreview').innerHTML = html;
-    document.getElementById('customizableTableData').value = JSON.stringify(dataRows);
-
-    dataRows.length ? enableNextButton() : disableNextButton();
-}
-
-function removeExcelRow(button) {
-    const row = button.closest('tr');
-    row.remove();
-
-    // Recalculate totals and cost
-    const updatedRows = [];
-    const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
-    const unitPrice = selectedService?.price || 0;
-
-    document.querySelectorAll('#customExcelBody tr').forEach(row => {
-        const size = row.cells[0].textContent.trim();
-        const qty = parseInt(row.cells[1].textContent.trim()) || 0;
-        const cost = qty * unitPrice;
-        row.querySelector('.cost-cell').textContent = `₱${cost.toFixed(2)}`;
-        if (qty > 0) updatedRows.push({ size, quantity: qty, cost });
+    html += `<tr>`;
+    row.forEach((cell, colIndex) => {
+      const val = cell ?? '';
+      if (colIndex === sizeIndex) {
+        html += `<td><select class='form-control' onchange='updateCustomRow(this)' data-row='${i}' data-col='${colIndex}'>
+          <option value='Small' ${val === 'Small' ? 'selected' : ''}>Small</option>
+          <option value='Medium' ${val === 'Medium' ? 'selected' : ''}>Medium</option>
+          <option value='Large' ${val === 'Large' ? 'selected' : ''}>Large</option>
+          <option value='XL' ${val === 'XL' ? 'selected' : ''}>XL</option>
+        </select></td>`;
+      } else if (colIndex === qtyIndex) {
+        html += `<td><input type='number' class='form-control' min='1' value='${val}' oninput='updateCustomRow(this)' data-row='${i}' data-col='${colIndex}'></td>`;
+      } else {
+        html += `<td>${val}</td>`;
+      }
     });
 
-    const totalQty = updatedRows.reduce((sum, r) => sum + r.quantity, 0);
-    const freeShirts = Math.floor(totalQty / 12);
+    html += `<td class='cost-cell'>₱${cost.toFixed(2)}</td>`;
+    html += `<td><button class='btn btn-outline-danger btn-sm' onclick='removeExcelRow(this, ${i})'>Remove</button></td></tr>`;
+    dataRows.push({ size, quantity, cost, meta: row });
+  }
 
-    const updatedNote = `
-      <p class="mt-3 text-success">
-        🎁 Eligible for <strong>${freeShirts}</strong> free shirt(s) (1 free every 12 ordered).
-      </p>
-    `;
-    document.querySelector('#excelPreview').innerHTML = document.querySelector('#excelPreview').innerHTML.replace(/<p class="mt-3 text-success">.*?<\/p>/s, updatedNote);
+  html += `</tbody></table>`;
+  const totalQty = dataRows.reduce((sum, r) => sum + r.quantity, 0);
+  const freeShirts = Math.floor(totalQty / 12);
+  html += `<p class='mt-3 text-success'>🎁 Eligible for <strong>${freeShirts}</strong> free shirt(s).</p>`;
 
-    document.getElementById('customizableTableData').value = JSON.stringify(updatedRows);
-    updatedRows.length ? enableNextButton() : disableNextButton();
+  sessionStorage.setItem('uploadedDesignList', JSON.stringify(json));
+  document.getElementById('customizableTableData').value = JSON.stringify(dataRows);
+  document.getElementById('excelPreview').innerHTML = html;
+
+  checkNextButtonCondition();
 }
 
+function updateCustomRow(el) {
+  const rowData = JSON.parse(sessionStorage.getItem('uploadedDesignList'));
+  const rowIndex = parseInt(el.dataset.row);
+  const colIndex = parseInt(el.dataset.col);
+  const value = el.value;
 
-function removeExcelFile() {
-    document.getElementById('excelFile').value = '';
-    document.getElementById('excelPreview').innerHTML = '';
-    document.getElementById('excelActions').classList.add('d-none');
-    sessionStorage.removeItem('uploadedDesignList');
-    disableNextButton();
+  if (rowData[rowIndex]) {
+    rowData[rowIndex][colIndex] = value;
+    sessionStorage.setItem('uploadedDesignList', JSON.stringify(rowData));
+    renderExcelTable(rowData);
+  }
+}
+
+function removeExcelRow(btn, rowIndex) {
+  const rowData = JSON.parse(sessionStorage.getItem('uploadedDesignList'));
+  rowData.splice(rowIndex, 1);
+  sessionStorage.setItem('uploadedDesignList', JSON.stringify(rowData));
+  renderExcelTable(rowData);
 }
 
 function addManualRow() {
-    const tbody = document.getElementById('manualTableBody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td>
-            <select class="form-control" name="size[]" onchange="updateCost(this)">
-                <option value="Small">Small</option>
-                <option value="Medium">Medium</option>
-                <option value="Large">Large</option>
-            </select>
-        </td>
-        <td>
-            <input type="number" class="form-control" name="quantity[]" min="1" placeholder="e.g., 12" oninput="updateCost(this)">
-        </td>
-        <td class="cost-cell">₱0.00</td>
-        <td>
-            <button class="btn btn-outline-danger btn-sm" onclick="removeManualRow(this)">Remove</button>
-        </td>
-    `;
-    tbody.appendChild(tr);
+  const tbody = document.getElementById('manualTableBody');
+  const newRow = document.createElement('tr');
+  newRow.innerHTML = `
+    <td>
+      <select class="form-control" name="size[]" onchange="updateCost(this)">
+        <option value="Small">Small</option>
+        <option value="Medium">Medium</option>
+        <option value="Large">Large</option>
+        <option value="XL">XL</option>
+      </select>
+    </td>
+    <td>
+      <input type="number" class="form-control" name="quantity[]" min="1" oninput="updateCost(this)">
+    </td>
+    <td class="cost-cell">₱0.00</td>
+    <td>
+      <button class="btn btn-outline-danger btn-sm" onclick="removeManualRow(this)">Remove</button>
+    </td>
+  `;
+  tbody.appendChild(newRow);
 }
-
-const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
-const unitPrice = selectedService?.price || 0;
-
-function updateCost(el) {
-    const row = el.closest('tr');
-    const quantity = parseInt(row.querySelector('input[name="quantity[]"]').value) || 0;
-    const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
-    const unitPrice = selectedService?.price || 0;
-
-    const total = quantity * unitPrice;
-    row.querySelector('.cost-cell').textContent = `₱${total.toFixed(2)}`;
-
-    updateStandardValidation();
-}
-
 
 function removeManualRow(btn) {
-    btn.closest('tr').remove();
-    updateStandardValidation();
+  btn.closest('tr').remove();
+  updateStandardValidation();
+}
+
+function updateCost(el) {
+  const row = el.closest('tr');
+  const quantity = parseInt(row.querySelector('input[name="quantity[]"]').value) || 0;
+  const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
+  const unitPrice = selectedService?.price || 0;
+  const total = quantity * unitPrice;
+  row.querySelector('.cost-cell').textContent = `₱${total.toFixed(2)}`;
+  updateStandardValidation();
 }
 
 function updateStandardValidation() {
-    const rows = document.querySelectorAll('#manualTableBody tr');
-    const data = [];
+  const rows = document.querySelectorAll('#manualTableBody tr');
+  const data = [];
+  let valid = false;
 
-    let valid = false;
+  rows.forEach(row => {
+    const size = row.querySelector('select[name="size[]"]').value;
+    const quantity = parseInt(row.querySelector('input[name="quantity[]"]').value) || 0;
+    if (quantity > 0) {
+      data.push([size, quantity]);
+      valid = true;
+    }
+  });
 
-    rows.forEach(row => {
-        const size = row.querySelector('select[name="size[]"]').value;
-        const quantity = parseInt(row.querySelector('input[name="quantity[]"]').value) || 0;
-        if (quantity > 0) {
-            data.push({ size, quantity });
-            valid = true;
-        }
+  if (valid) {
+    const worksheet = XLSX.utils.aoa_to_sheet([['Size', 'Quantity'], ...data]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'StandardOrder');
+    const excelData = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+    sessionStorage.setItem('standardDesignExcel', excelData);
+    document.getElementById('standardTableData').value = JSON.stringify(data.map(([size, qty]) => ({ size, quantity: qty })));
+  } else {
+    sessionStorage.removeItem('standardDesignExcel');
+    document.getElementById('standardTableData').value = '';
+  }
+
+  checkNextButtonCondition();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setNextButtonState(false);
+  updateStandardValidation();
+});
+
+document.getElementById('nextBtn')?.addEventListener('click', function () {
+  const isCustom = document.getElementById('customizable')?.checked;
+  const isStandard = document.getElementById('standard')?.checked;
+  const selectedService = JSON.parse(sessionStorage.getItem('selectedService'));
+  const servicePrice = parseFloat(selectedService?.price) || 0;
+
+  let items = [], totalItems = 0, shirtTotal = 0;
+
+  if (isCustom) {
+    const data = JSON.parse(document.getElementById('customizableTableData')?.value || '[]');
+    items = data.map(row => {
+      const quantity = parseInt(row.quantity);
+      const cost = row.cost;
+      totalItems += quantity;
+      shirtTotal += cost;
+      return {
+        size: row.size,
+        quantity,
+        price_per_unit: cost / quantity,
+        cost
+      };
     });
+  } else if (isStandard) {
+    const data = JSON.parse(document.getElementById('standardTableData')?.value || '[]');
+    items = data.map(row => {
+      const quantity = parseInt(row.quantity);
+      const unitPrice = selectedService.price;
+      const cost = quantity * unitPrice;
+      totalItems += quantity;
+      shirtTotal += cost;
+      return {
+        size: row.size,
+        quantity,
+        price_per_unit: unitPrice,
+        cost
+      };
+    });
+  }
 
-    document.getElementById('standardTableData').value = JSON.stringify(data);
-    valid ? enableNextButton() : disableNextButton();
-}
+  const grandTotal = shirtTotal + servicePrice;
 
-function enableNextButton() {
-    const btn = document.getElementById('nextBtn');
-    if (btn) {
-        btn.disabled = false;
-        btn.classList.remove('btn-secondary');
-        btn.classList.add('btn-primary');
-    }
-}
+  sessionStorage.setItem('orderSummaryData', JSON.stringify({
+    items,
+    totalItems,
+    shirtTotal,
+    servicePrice,
+    grandTotal
+  }));
 
-function disableNextButton() {
-    const btn = document.getElementById('nextBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-secondary');
-    }
-}
+  const designInput = document.getElementById('excelFile');
+  if (designInput && designInput.files.length > 0) {
+    const file = designInput.files[0];
+    sessionStorage.setItem('uploadedDesign', URL.createObjectURL(file));
+    sessionStorage.setItem('uploadedDesignName', file.name);
+  }
 
-document.addEventListener('DOMContentLoaded', disableNextButton);
+  document.querySelectorAll('.step-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('step4').classList.add('active');
+    showStep4AndDisplaySummary(); // ✅ This triggers Step 4 display and renders the table
+
+});
 </script>
