@@ -5,9 +5,27 @@ require_once __DIR__ . '../../../../config/session_handler.php';
 <div class="order-complete-card text-center">
     <div class="emoji-wrapper">🎉</div>
     <h5 class="text-success fw-bold mb-3">Order Complete!</h5>
-    <p class="text-muted mb-4">Thank you for placing your order! You can track the progress from your dashboard.</p>
+    <p class="text-muted mb-4">Thank you for placing your order!</p>
+    <p class="fw-bold" style="font-size: 1.2rem; color: #0B5CF9;">Order #<span id="completedOrderId">---</span></p>
+    <p class="text-muted mb-4">You can track the progress from your dashboard.</p>
     <a href="/dashboards/customer/dashboard.php" class="btn btn-success btn-lg">Back to Dashboard</a>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var orderId = sessionStorage.getItem('submittedOrderId');
+    if (orderId) {
+        document.getElementById('completedOrderId').textContent = 'ORD-' + orderId;
+    }
+    sessionStorage.removeItem('selectedService');
+    sessionStorage.removeItem('uploadedDesign');
+    sessionStorage.removeItem('orderSummaryData');
+    sessionStorage.removeItem('uploadedDesignName');
+    sessionStorage.removeItem('uploadedDesignList');
+    sessionStorage.removeItem('standardDesignExcel');
+    sessionStorage.removeItem('submittedOrderId');
+});
+</script>
 
 
 <style>

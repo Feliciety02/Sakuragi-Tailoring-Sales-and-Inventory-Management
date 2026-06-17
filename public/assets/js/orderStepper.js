@@ -54,10 +54,78 @@ function updateStepper() {
 function nextStep() {
     if (!validateStep(currentStep)) return;
 
+    if (currentStep === 5) {
+        submitOrder();
+        return;
+    }
+
     if (currentStep < totalSteps) {
         currentStep++;
         updateStepper();
     }
+}
+
+function submitOrder() {
+    const nextBtn = document.getElementById('nextBtn');
+    const statusDiv = document.getElementById('orderSubmissionStatus');
+    if (nextBtn) { nextBtn.disabled = true; nextBtn.textContent = 'Submitting...'; }
+    if (statusDiv) {
+        statusDiv.className = 'alert alert-info mt-3';
+        statusDiv.textContent = 'Submitting your order...';
+        statusDiv.classList.remove('d-none');
+    }
+
+    const serviceData = JSON.parse(sessionStorage.getItem('selectedService'));
+    const orderData = JSON.parse(sessionStorage.getItem('orderSummaryData'));
+    const refNum = document.getElementById('referenceNumber')?.value?.trim() || '';
+
+    const formData = new FormData();
+    formData.append('service_id', serviceData?.id || 0);
+    formData.append('items', JSON.stringify(orderData?.items || []));
+    formData.append('reference_number', refNum);
+
+    const designInput = document.getElementById('image');
+    if (designInput && designInput.files && designInput.files.length > 0) {
+        formData.append('design_file', designInput.files[0]);
+    }
+
+    const excelInput = document.getElementById('excelFile');
+    if (excelInput && excelInput.files && excelInput.files.length > 0) {
+        formData.append('excel_file', excelInput.files[0]);
+    }
+
+    const proofInput = document.getElementById('paymentProof');
+    if (proofInput && proofInput.files && proofInput.files.length > 0) {
+        formData.append('payment_proof', proofInput.files[0]);
+    }
+
+    fetch('/controller/submit_order.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            sessionStorage.setItem('submittedOrderId', data.order_id);
+            currentStep = 6;
+            updateStepper();
+        } else {
+            if (statusDiv) {
+                statusDiv.className = 'alert alert-danger mt-3';
+                statusDiv.textContent = data.error || 'Order submission failed. Please try again.';
+                statusDiv.classList.remove('d-none');
+            }
+            if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Finish'; }
+        }
+    })
+    .catch(err => {
+        if (statusDiv) {
+            statusDiv.className = 'alert alert-danger mt-3';
+            statusDiv.textContent = 'Network error. Please check your connection and try again.';
+            statusDiv.classList.remove('d-none');
+        }
+        if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Finish'; }
+    });
 }
 
 function prevStep() {

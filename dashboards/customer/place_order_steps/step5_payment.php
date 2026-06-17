@@ -63,6 +63,37 @@ require_once __DIR__ . '../../../../config/session_handler.php';
     </div>
 </div>
 
+<script>
+let paymentImageData = null;
+
+function handlePaymentImageUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        alert('Please upload a valid image file (JPG or PNG).');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        paymentImageData = e.target.result;
+        document.getElementById('paymentImagePreview').querySelector('img').src = paymentImageData;
+        document.getElementById('paymentImagePreview').classList.remove('d-none');
+        document.getElementById('uploadPlaceholder').classList.add('d-none');
+    };
+    reader.readAsDataURL(file);
+    setupStep5();
+}
+
+function removePaymentImage() {
+    document.getElementById('paymentProof').value = '';
+    paymentImageData = null;
+    document.getElementById('paymentImagePreview').classList.add('d-none');
+    document.getElementById('uploadPlaceholder').classList.remove('d-none');
+    setupStep5();
+}
+</script>
+
 <style>
 .payment-container {
     max-width: 850px;
