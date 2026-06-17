@@ -1,4 +1,13 @@
 /* ===================== BASE RESET ===================== */
+:root {
+    --brand-red: #f60000;
+    --brand-red-dark: #b30000;
+    --brand-black: #111111;
+    --brand-black-soft: #1f1f1f;
+    --brand-white: #ffffff;
+    --brand-border: rgba(255, 255, 255, 0.12);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -17,7 +26,7 @@
   .sidebar {
     width: 220px;
     height: calc(100vh - 75px);
-    background: linear-gradient(to bottom, #0B5CF9, #4D8CFF);
+    background: linear-gradient(to bottom, var(--brand-black), var(--brand-red));
     position: fixed;
     top: 75px;
     left: 0;
@@ -155,7 +164,7 @@
   
   /* ===================== HEADER ===================== */
   .main-header {
-    background: linear-gradient(135deg, #246BFD, #0B5CF9);
+    background: linear-gradient(135deg, var(--brand-black), var(--brand-red));
     color: white;
     position: sticky;
     top: 0;
@@ -178,19 +187,11 @@
     gap: 12px;
   }
   
-  .logo-icon {
-    font-size: 28px;
-    color: white;
-    padding: 8px;
-  }
-  
   .header-logo {
-    height: 42px;
-    width: 42px;
-    border-radius: 10px;
-    background-color: white;
-    padding: 5px;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    height: 48px;
+    width: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25));
   }
   
   .header-title,
@@ -219,7 +220,7 @@
     border: none;
     border-radius: 6px;
     background-color: white;
-    color: #0B5CF9;
+    color: var(--brand-red);
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
@@ -230,8 +231,8 @@
   
   .logout-btn:hover, .login-btn:hover {
     opacity: 1;
-    background-color: #e8efff;
-    color: #246BFD;
+    background-color: #fff1f1;
+    color: var(--brand-red-dark);
     transform: translateY(-2px);
   }
   
@@ -323,7 +324,7 @@
   
   /* ===================== FOOTER ===================== */
   .main-footer {
-    background: linear-gradient(to right, #0B5CF9, #4D8CFF);
+    background: linear-gradient(to right, var(--brand-black), var(--brand-red));
     color: white;
     text-align: center;
     padding: 16px 20px;

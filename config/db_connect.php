@@ -1,18 +1,17 @@
 <?php
-// Enable error reporting for debugging
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 $host = 'localhost';
 $dbname = 'sakuragi_db';
 $user = 'root';
-$pass = ''; // Replace with your actual MySQL password
+$pass = getenv('DB_PASSWORD') ?: ''; // Set DB_PASSWORD env var in production
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
 } catch (PDOException $e) {
-    die('Database connection failed: ' . $e->getMessage());
+    error_log('Database connection failed: ' . $e->getMessage());
+    die('Database connection failed. Please check configuration.');
 }
 ?>

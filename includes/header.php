@@ -7,6 +7,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sakuragi Tailoring Shop</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
   <link rel="stylesheet" href="/public/assets/css/includes.css" />
   <link rel="stylesheet" href="/public/assets/css/tables.css" />
   
@@ -34,7 +35,7 @@
     <!-- Content -->
     <div class="header-container">
         <div class="logo-area">
-            <i class="fas fa-scissors logo-icon"></i>
+            <img src="/public/assets/images/sakuragi-logo.png" alt="Sakuragi logo" class="header-logo">
             <span class="header-title">Sakuragi Tailoring Shop</span>
         </div>
 
