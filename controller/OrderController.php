@@ -181,7 +181,3 @@ class OrderController
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 } ?>
-<!-- Function to display order details in modal -->
-<script src="../../public/assets/js/order.js"></script>
-
-

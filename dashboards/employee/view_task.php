@@ -1,509 +1,387 @@
 <?php
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
-require_once '../../middleware/auth_required.php'; // Any logged-in user
-require_once '../../config/db_connect.php'; // Add database connection
+require_once __DIR__ . '/../../config/db_connect.php';
+require_once '../../middleware/auth_required.php';
 require_once '../../includes/header.php';
 require_once '../../includes/sidebar_employee.php';
 
-// Protect: If customer somehow reaches employee pages
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
     exit();
 }
 
-// Get currently logged in user's ID
-$user_id = $_SESSION['user_id'];
-
-// Check if task ID is provided
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header('Location: my_tasks.php');
     exit();
 }
 
-$task_id = (int) $_GET['id'];
+$user_id = $_SESSION['user_id'];
+$order_id = (int)$_GET['id'];
 
-try {
-    // Fetch task details
-    $taskSql = "
-        SELECT o.order_id, o.order_date, o.status, o.expected_completion, 
-               o.total_price,
-               ow.stage, ow.product_type, ow.workflow_notes, ow.assigned_employee,
-               s.service_id, s.service_name, s.category AS service_category
-        FROM orders o
-        JOIN order_workflow ow ON o.order_id = ow.order_id
-        LEFT JOIN services s ON o.service_id = s.service_id
-        WHERE o.order_id = ?
-        AND ow.assigned_employee = ?
-    ";
-    $taskStmt = $pdo->prepare($taskSql);
-    $taskStmt->execute([$task_id, $user_id]);
-    $task = $taskStmt->fetch();
+// Verify ownership and fetch task
+$taskStmt = $pdo->prepare("
+    SELECT o.order_id, o.order_date, o.status, o.total_price, o.completion_date,
+           ow.stage, ow.product_type, ow.workflow_notes, ow.assigned_employee,
+           ow.expected_completion, ow.priority, ow.started_at,
+           s.service_name
+    FROM orders o
+    JOIN order_workflow ow ON o.order_id = ow.order_id
+    LEFT JOIN services s ON o.service_id = s.service_id
+    WHERE o.order_id = ? AND ow.assigned_employee = ?
+");
+$taskStmt->execute([$order_id, $user_id]);
+$task = $taskStmt->fetch();
 
-    if (!$task) {
-        // Task not found or doesn't belong to this employee
-        header('Location: my_tasks.php');
-        exit();
-    }
-
-    // Fetch customer information
-    $customerSql = "
-        SELECT u.*, COALESCE(u.first_name, u.name, u.full_name) AS display_name
-        FROM users u
-        JOIN orders o ON u.user_id = o.user_id
-        WHERE o.order_id = ?
-    ";
-    $customerStmt = $pdo->prepare($customerSql);
-    $customerStmt->execute([$task_id]);
-    $customer = $customerStmt->fetch();
-
-    // Fetch design files
-    $filesSql = "
-        SELECT file_id, file_path, file_type, upload_date
-        FROM order_files
-        WHERE order_id = ?
-    ";
-    $filesStmt = $pdo->prepare($filesSql);
-    $filesStmt->execute([$task_id]);
-    $designFiles = $filesStmt->fetchAll();
-
-    // Count total items for this order
-    $itemsSql = "
-        SELECT SUM(quantity) as total_items
-        FROM order_details
-        WHERE order_id = ?
-    ";
-    $itemsStmt = $pdo->prepare($itemsSql);
-    $itemsStmt->execute([$task_id]);
-    $totalItems = $itemsStmt->fetchColumn() ?: 0;
-
-    // Get size breakdown
-    $sizesSql = "
-        SELECT size, quantity
-        FROM order_details
-        WHERE order_id = ?
-    ";
-    $sizesStmt = $pdo->prepare($sizesSql);
-    $sizesStmt->execute([$task_id]);
-    $sizes = $sizesStmt->fetchAll();
-
-    // Handle task status update
-    $statusMessage = '';
-    $statusError = '';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
-        $newStatus = $_POST['task_status'] ?? '';
-        $workNotes = $_POST['work_notes'] ?? '';
-
-        if (!empty($newStatus)) {
-            try {
-                // Begin transaction
-                $pdo->beginTransaction();
-
-                // Update order workflow stage
-                $updateStageSql = "
-                    UPDATE order_workflow SET stage = ?, workflow_notes = ?
-                    WHERE order_id = ? AND assigned_employee = ?
-                ";
-                $updateStageStmt = $pdo->prepare($updateStageSql);
-                $updateStageStmt->execute([$newStatus, $workNotes, $task_id, $user_id]);
-
-                // Notify customer
-                try {
-                    $ownerStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
-                    $ownerStmt->execute([$task_id]);
-                    $owner = $ownerStmt->fetch();
-                    if ($owner) {
-                        require_once __DIR__ . '/../../controller/NotificationController.php';
-                        $notif = new NotificationController($pdo);
-                        $notif->create($owner['user_id'], "Your order #ORD-{$task_id} stage updated to: {$newStatus}.");
-                    }
-                } catch (Exception $e) {
-                    error_log('Notif failed: ' . $e->getMessage());
-                }
-
-                // Commit transaction
-                $pdo->commit();
-
-                // Update local variable for display
-                $task['stage'] = $newStatus;
-                $task['workflow_notes'] = $workNotes;
-
-                $statusMessage = 'Task status updated successfully';
-            } catch (PDOException $e) {
-                // Rollback transaction on error
-                $pdo->rollBack();
-                error_log('Task update error: ' . $e->getMessage());
-                $statusError = 'Failed to update task status. Please try again.';
-            }
-        } else {
-            $statusError = 'Please select a valid status';
-        }
-    }
-
-    // Format the task ID for display
-    $jobId = 'JOB-' . str_pad($task['order_id'], 4, '0', STR_PAD_LEFT);
-
-    // Format dates
-    $orderDate = date('M d, Y', strtotime($task['order_date']));
-    $deadlineDate = !empty($task['expected_completion'])
-        ? date('M d, Y', strtotime($task['expected_completion']))
-        : 'Not specified';
-
-    // Calculate days remaining until deadline
-    $daysRemaining = 0;
-    $deadlineClass = 'text-success';
-
-    if (!empty($task['expected_completion'])) {
-        $today = new DateTime();
-        $deadline = new DateTime($task['expected_completion']);
-        $daysRemaining = $today->diff($deadline)->days;
-
-        if ($deadline < $today) {
-            $daysRemaining = -$daysRemaining; // Make it negative to indicate overdue
-            $deadlineClass = 'text-danger';
-        } elseif ($daysRemaining <= 2) {
-            $deadlineClass = 'text-warning';
-        }
-    }
-
-    // Get progress percentage based on stage
-    $progressPercentage = 0;
-    switch ($task['stage']) {
-        case STAGE_DESIGNING:
-            $progressPercentage = 20;
-            break;
-        case STAGE_PRINTING:
-            $progressPercentage = 40;
-            break;
-        case STAGE_EMBROIDERY:
-            $progressPercentage = 60;
-            break;
-        case STAGE_QUALITY_CHECK:
-            $progressPercentage = 80;
-            break;
-        case STAGE_PACKAGING:
-        case STAGE_SHIPPED:
-            $progressPercentage = 100;
-            break;
-        default:
-            $progressPercentage = 10;
-    }
-} catch (PDOException $e) {
-    // Log error and redirect to my tasks
-    error_log('View Task error: ' . $e->getMessage());
+if (!$task) {
     header('Location: my_tasks.php');
     exit();
 }
+
+// Customer info
+$custStmt = $pdo->prepare("SELECT u.full_name, u.email, u.phone_number FROM users u JOIN orders o ON u.user_id = o.user_id WHERE o.order_id = ?");
+$custStmt->execute([$order_id]);
+$customer = $custStmt->fetch();
+
+// Size breakdown
+$sizes = $pdo->prepare("SELECT size, quantity FROM order_details WHERE order_id = ?");
+$sizes->execute([$order_id]);
+$sizeItems = $sizes->fetchAll();
+$totalQty = array_sum(array_column($sizeItems, 'quantity'));
+
+// Design files
+$files = $pdo->prepare("SELECT file_id, file_path, file_type, upload_date FROM order_files WHERE order_id = ?");
+$files->execute([$order_id]);
+$designFiles = $files->fetchAll();
+
+// Production notes
+$notes = $pdo->prepare("
+    SELECT pn.*, u.full_name AS author_name
+    FROM production_notes pn
+    LEFT JOIN users u ON pn.author_id = u.user_id
+    WHERE pn.order_id = ?
+    ORDER BY pn.created_at DESC LIMIT 20
+");
+$notes->execute([$order_id]);
+$prodNotes = $notes->fetchAll();
+
+// Task media
+$media = $pdo->prepare("SELECT * FROM task_media WHERE order_id = ? ORDER BY uploaded_at DESC");
+$media->execute([$order_id]);
+$taskMedia = $media->fetchAll();
+
+// QC status
+$qcStmt = $pdo->prepare("SELECT * FROM qc_inspections WHERE order_id = ?");
+$qcStmt->execute([$order_id]);
+$qc = $qcStmt->fetch();
+
+// Rework log
+$rework = $pdo->prepare("SELECT * FROM rework_log WHERE order_id = ? ORDER BY created_at DESC");
+$rework->execute([$order_id]);
+$reworkLog = $rework->fetchAll();
+
+$progress = getStageProgress($task['stage']);
+$daysRemaining = $task['expected_completion'] ? max(0, (strtotime($task['expected_completion']) - time()) / 86400) : null;
+$isOverdue = $task['expected_completion'] && strtotime($task['expected_completion']) < time();
 ?>
-
-<main class="main-content">
-    <div class="container-fluid mb-4">
-        <div class="row align-items-center">
-            <div class="col-12 mb-3">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="my_tasks.php">My Tasks</a></li>
-                        <li class="breadcrumb-item active" aria-current="page"><?= htmlspecialchars($jobId) ?></li>
-                    </ol>
-                </nav>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <h1 class="fw-bold mb-0"><?= htmlspecialchars($jobId) ?></h1>
-                <p class="text-muted"><?= htmlspecialchars($task['product_type'] ?? 'Custom Garment') ?></p>
-            </div>
-            <div class="col-md-6 text-md-end">
-                <span class="badge rounded-pill <?= $task['status'] === 'In Progress'
-                    ? 'bg-primary'
-                    : 'bg-secondary' ?> px-3 py-2 mb-2">
-                    <?= htmlspecialchars($task['status']) ?>
-                </span>
-                
-                <?php if ($daysRemaining > 0): ?>
-                <p class="<?= $deadlineClass ?> mb-0 mt-2">
-                    <i class="fas fa-calendar-alt me-1"></i> 
-                    <?= $daysRemaining ?> days remaining
-                </p>
-                <?php elseif ($daysRemaining < 0): ?>
-                <p class="<?= $deadlineClass ?> mb-0 mt-2">
-                    <i class="fas fa-exclamation-circle me-1"></i> 
-                    <?= abs($daysRemaining) ?> days overdue
-                </p>
-                <?php else: ?>
-                <p class="text-warning mb-0 mt-2">
-                    <i class="fas fa-exclamation-circle me-1"></i> 
-                    Due today
-                </p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Status Messages -->
-    <?php if (!empty($statusMessage)): ?>
-    <div class="container-fluid mb-4">
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fas fa-check-circle me-2"></i> <?= htmlspecialchars($statusMessage) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    </div>
-    <?php endif; ?>
-    
-    <?php if (!empty($statusError)): ?>
-    <div class="container-fluid mb-4">
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i> <?= htmlspecialchars($statusError) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    </div>
-    <?php endif; ?>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Task Details -->
-            <div class="col-lg-8 mb-4">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Task Overview</h5>
-                        
-                        <!-- Progress -->
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="mb-0">Progress</h6>
-                                <span class="text-muted"><?= $progressPercentage ?>%</span>
-                            </div>
-                            <div class="progress" style="height: 10px;">
-                                <div class="progress-bar bg-primary" role="progressbar" 
-                                    style="width: <?= $progressPercentage ?>%;" 
-                                    aria-valuenow="<?= $progressPercentage ?>" 
-                                    aria-valuemin="0" 
-                                    aria-valuemax="100"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Order Date</h6>
-                                    <p class="mb-0"><?= htmlspecialchars($orderDate) ?></p>
-                                </div>
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Deadline</h6>
-                                    <p class="mb-0 <?= $deadlineClass ?>"><?= htmlspecialchars($deadlineDate) ?></p>
-                                </div>
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Current Stage</h6>
-                                    <p class="mb-0"><?= htmlspecialchars($task['stage'] ?? 'Not started') ?></p>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Service Type</h6>
-                                    <p class="mb-0"><?= htmlspecialchars(
-                                        $task['service_name'] ?? 'Custom Service'
-                                    ) ?></p>
-                                </div>
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Total Items</h6>
-                                    <p class="mb-0"><?= $totalItems ?> items</p>
-                                </div>
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">Customer</h6>
-                                    <p class="mb-0"><?= htmlspecialchars($customer['display_name'] ?? 'N/A') ?></p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Size Breakdown -->
-                        <div class="mb-4">
-                            <h6 class="text-muted mb-3">Size Breakdown</h6>
-                            <div class="row">
-                                <?php foreach ($sizes as $size): ?>
-                                <div class="col-sm-3 col-6 mb-3">
-                                    <div class="card border-0 bg-light">
-                                        <div class="card-body text-center p-3">
-                                            <h5 class="mb-0"><?= htmlspecialchars($size['quantity']) ?></h5>
-                                            <small class="text-muted">Size <?= htmlspecialchars(
-                                                $size['size']
-                                            ) ?></small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        
-                        <!-- Workflow Notes -->
-                        <div class="mb-0">
-                            <h6 class="text-muted mb-2">Workflow Notes</h6>
-                            <div class="p-3 bg-light rounded">
-                                <?php if (!empty($task['workflow_notes'])): ?>
-                                <p class="mb-0"><?= nl2br(htmlspecialchars($task['workflow_notes'])) ?></p>
-                                <?php else: ?>
-                                <p class="text-muted mb-0">No workflow notes added yet.</p>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Design Files -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Design Files</h5>
-                        
-                        <?php if (!empty($designFiles)): ?>
-                        <div class="row">
-                            <?php foreach ($designFiles as $file): ?>
-                                <?php
-                                $filePath = '/public/uploads/designs/' . $file['file_path'];
-                                $fileExt = pathinfo($file['file_path'], PATHINFO_EXTENSION);
-                                $isImage = in_array(strtolower($fileExt), ['jpg', 'jpeg', 'png', 'gif', 'webp']);
-                                ?>
-                                <div class="col-md-4 col-6 mb-3">
-                                    <div class="card h-100">
-                                        <?php if ($isImage): ?>
-                                        <img src="<?= htmlspecialchars(
-                                            $filePath
-                                        ) ?>" class="card-img-top img-fluid" alt="Design File">
-                                        <?php else: ?>
-                                        <div class="card-img-top text-center py-5 bg-light">
-                                            <i class="fas fa-file-alt fa-3x text-muted"></i>
-                                        </div>
-                                        <?php endif; ?>
-                                        <div class="card-body p-2 text-center">
-                                            <small class="text-muted"><?= htmlspecialchars(
-                                                $file['file_type'] ?? 'File'
-                                            ) ?></small>
-                                        </div>
-                                        <div class="card-footer p-2 text-center bg-white">
-                                            <a href="<?= htmlspecialchars(
-                                                $filePath
-                                            ) ?>" class="btn btn-sm btn-outline-primary" target="_blank">
-                                                <i class="fas fa-download me-1"></i> Download
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php else: ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-file-image fs-1 text-muted mb-3"></i>
-                            <p class="text-muted">No design files have been uploaded for this order.</p>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Update Status -->
-            <div class="col-lg-4 mb-4">
-                <div class="card shadow-sm sticky-top" style="top: 20px;">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Update Status</h5>
-                        <form action="<?= htmlspecialchars($_SERVER['PHP_SELF'] . '?id=' . $task_id) ?>" method="post">
-                            <div class="mb-3">
-                                <label for="task_status" class="form-label">Current Stage</label>
-                                <select class="form-select" id="task_status" name="task_status" required>
-                                    <option value="<?= STAGE_DESIGNING ?>" <?= $task['stage'] === STAGE_DESIGNING
-    ? 'selected'
-    : '' ?>>
-                                        Designing
-                                    </option>
-                                    <option value="<?= STAGE_PRINTING ?>" <?= $task['stage'] === STAGE_PRINTING
-    ? 'selected'
-    : '' ?>>
-                                        Printing
-                                    </option>
-                                    <option value="<?= STAGE_EMBROIDERY ?>" <?= $task['stage'] === STAGE_EMBROIDERY
-    ? 'selected'
-    : '' ?>>
-                                        Embroidery
-                                    </option>
-                                    <option value="<?= STAGE_QUALITY_CHECK ?>" <?= $task['stage'] ===
-STAGE_QUALITY_CHECK
-    ? 'selected'
-    : '' ?>>
-                                        Quality Check
-                                    </option>
-                                    <option value="<?= STAGE_PACKAGING ?>" <?= $task['stage'] === STAGE_PACKAGING
-    ? 'selected'
-    : '' ?>>
-                                        Packaging
-                                    </option>
-                                </select>
-                                <div class="form-text">Update the current stage of the task</div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label for="work_notes" class="form-label">Work Notes</label>
-                                <textarea class="form-control" id="work_notes" name="work_notes" rows="5"><?= htmlspecialchars(
-                                    $task['workflow_notes'] ?? ''
-                                ) ?></textarea>
-                                <div class="form-text">Add notes about your progress or any issues</div>
-                            </div>
-                            
-                            <div class="d-grid gap-2">
-                                <button type="submit" name="update_status" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i> Update Status
-                                </button>
-                                
-                                <?php if (
-                                    $task['stage'] !== STAGE_DESIGNING &&
-                                    $task['stage'] !== STAGE_PRINTING &&
-                                    $task['stage'] !== STAGE_EMBROIDERY
-                                ): ?>
-                                <a href="submit_work.php" class="btn btn-success">
-                                    <i class="fas fa-upload me-1"></i> Submit for QC
-                                </a>
-                                <?php endif; ?>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                
-                <!-- Contact Info -->
-                <div class="card shadow-sm mt-4">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Customer Information</h5>
-                        
-                        <div class="mb-3">
-                            <p class="mb-1"><strong>Name:</strong> <?= htmlspecialchars(
-                                $customer['display_name'] ?? 'N/A'
-                            ) ?></p>
-                            <p class="mb-1"><strong>Email:</strong> <?= htmlspecialchars(
-                                $customer['email'] ?? 'N/A'
-                            ) ?></p>
-                            <p class="mb-0"><strong>Phone:</strong> <?= htmlspecialchars(
-                                $customer['phone'] ?? ($customer['phone_number'] ?? 'N/A')
-                            ) ?></p>
-                        </div>
-                        
-                        <?php if (!empty($customer['notes'])): ?>
-                        <div class="mt-4">
-                            <h6 class="text-muted mb-2">Customer Notes</h6>
-                            <div class="p-3 bg-light rounded">
-                                <p class="mb-0"><?= nl2br(htmlspecialchars($customer['notes'])) ?></p>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</main>
-
+<link rel="stylesheet" href="/public/assets/css/mes.css">
 <style>
-.sticky-top {
-    z-index: 100;
-}
+  body { background: #f5f5f5; }
+  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
+  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
+  .mes-timeline-dot { width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px }
+  .mes-timeline-line { width:2px;flex-shrink:0;margin-left:5px;min-height:24px;background:#e5e7eb }
+  .mes-timeline-line.active { background:var(--mes-primary) }
 </style>
+
+<div class="main-content">
+  <!-- Breadcrumb -->
+  <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
+    <a href="dashboard.php" style="color:var(--mes-primary)">Dashboard</a>
+    <span>/</span>
+    <a href="my_tasks.php" style="color:var(--mes-primary)">My Tasks</a>
+    <span>/</span>
+    <span style="color:#374151">#ORD-<?= $order_id ?></span>
+  </div>
+
+  <!-- Header -->
+  <div class="mes-card mb-3">
+    <div class="mes-card-body" style="padding:20px 24px">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h2 style="font-size:18px;font-weight:700;margin:0">#ORD-<?= $order_id ?> — <?= htmlspecialchars($task['product_type'] ?? 'Garment') ?></h2>
+          <p style="font-size:13px;color:#6b7280;margin:4px 0 0"><?= htmlspecialchars($customer['full_name'] ?? 'N/A') ?> · Qty: <?= $totalQty ?> · <?= htmlspecialchars($task['service_name'] ?? 'Custom') ?></p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="mes-badge <?= $task['priority']==='urgent'?'mes-badge-danger':($task['priority']==='high'?'mes-badge-warning':'mes-badge-gray') ?>"><?= ucfirst($task['priority'] ?? 'med') ?></span>
+          <?php if ($isOverdue): ?>
+          <span class="mes-badge mes-badge-danger">Overdue</span>
+          <?php elseif ($daysRemaining !== null && $daysRemaining <= 2): ?>
+          <span class="mes-badge mes-badge-warning">Due soon</span>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+        <div style="flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">
+          <div style="width:<?= $progress ?>%;height:100%;background:var(--mes-primary);border-radius:4px;transition:width .5s"></div>
+        </div>
+        <span style="font-size:13px;font-weight:600;color:var(--mes-primary);white-space:nowrap"><?= $progress ?>%</span>
+        <span style="font-size:12px;color:#6b7280;white-space:nowrap">Stage: <?= htmlspecialchars($task['stage']) ?></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="mes-layout">
+    <div class="mes-main">
+      <!-- Stage Timeline -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Production Timeline</h3></div>
+        <div class="mes-card-body">
+          <div style="display:flex;flex-direction:column;gap:0">
+            <?php
+            $stages = [
+              STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_MATERIAL_PREP,
+              STAGE_CUTTING, STAGE_PRINTING, STAGE_SEWING,
+              STAGE_QUALITY_INSPECTION, STAGE_PACKAGING, STAGE_READY_PICKUP
+            ];
+            $currentIdx = array_search($task['stage'], $stages);
+            foreach ($stages as $i => $s):
+              $active = $i <= $currentIdx;
+              $isCurrent = $s === $task['stage'];
+            ?>
+            <div style="display:flex;gap:12px;padding:6px 0">
+              <div style="display:flex;flex-direction:column;align-items:center">
+                <div class="mes-timeline-dot" style="background:<?= $active ? ($isCurrent ? 'var(--mes-primary)' : '#10b981') : '#d1d5db' ?>;border:2px solid <?= $active ? ($isCurrent ? 'var(--mes-primary)' : '#10b981') : '#e5e7eb' ?>"></div>
+                <?php if ($i < count($stages)-1): ?>
+                <div class="mes-timeline-line<?= $active && $i < $currentIdx ? ' active' : '' ?>"></div>
+                <?php endif; ?>
+              </div>
+              <div style="font-size:13px;<?= $active ? 'color:#374151;font-weight:500' : 'color:#9ca3af' ?>">
+                <?= htmlspecialchars($s) ?>
+                <?php if ($isCurrent): ?><span class="mes-badge mes-badge-primary ms-2" style="font-size:10px">Current</span><?php endif; ?>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- Size Breakdown -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Order Items</h3></div>
+        <div class="mes-card-body">
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <?php foreach ($sizeItems as $s): ?>
+            <div style="background:#f3f4f6;border-radius:8px;padding:12px 20px;text-align:center;min-width:80px">
+              <div style="font-size:16px;font-weight:700;color:#374151"><?= (int)$s['quantity'] ?></div>
+              <div style="font-size:11px;color:#6b7280">Size <?= htmlspecialchars($s['size']) ?></div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- Design Files -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Design Files</h3></div>
+        <div class="mes-card-body">
+          <?php if (empty($designFiles)): ?>
+          <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:12px 0">No design files uploaded</p>
+          <?php else: ?>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <?php foreach ($designFiles as $f):
+              $path = '/public/uploads/designs/' . $f['file_path'];
+              $ext = strtolower(pathinfo($f['file_path'], PATHINFO_EXTENSION));
+              $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+            ?>
+            <a href="<?= $path ?>" target="_blank" style="display:block;width:120px;height:120px;border-radius:8px;overflow:hidden;background:#f3f4f6;border:1px solid #e5e7eb">
+              <?php if ($isImg): ?>
+              <img src="<?= $path ?>" style="width:100%;height:100%;object-fit:cover">
+              <?php else: ?>
+              <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;color:#9ca3af"><i class="fas fa-file-alt"></i></div>
+              <?php endif; ?>
+            </a>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Production Notes -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Production Notes</h3></div>
+        <div class="mes-card-body">
+          <form id="noteForm" style="margin-bottom:12px;display:flex;gap:8px">
+            <input type="hidden" name="action" value="add_note">
+            <input type="hidden" name="order_id" value="<?= $order_id ?>">
+            <input type="text" name="content" class="mes-form-input" placeholder="Add a note..." required style="flex:1">
+            <button type="submit" class="mes-btn mes-btn-primary mes-btn-sm">Add</button>
+          </form>
+          <?php if (empty($prodNotes)): ?>
+          <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:8px 0">No notes yet</p>
+          <?php else: ?>
+          <div class="mes-feed">
+            <?php foreach ($prodNotes as $n): ?>
+            <div class="mes-feed-item">
+              <div class="mes-feed-icon" style="background:<?= $n['note_type']==='issue'?'#fee2e2':($n['note_type']==='handoff'?'#d1fae5':'#dbeafe') ?>;color:<?= $n['note_type']==='issue'?'#dc2626':($n['note_type']==='handoff'?'#059669':'#2563eb') ?>">
+                <i class="fas fa-<?= $n['note_type']==='issue'?'exclamation-triangle':($n['note_type']==='handoff'?'check-double':'comment') ?>"></i>
+              </div>
+              <div class="mes-feed-content">
+                <p><?= htmlspecialchars($n['content']) ?></p>
+                <div class="mes-feed-time"><?= htmlspecialchars($n['author_name'] ?? 'System') ?> · <?= date('M d, g:i A', strtotime($n['created_at'])) ?></div>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Media Uploads -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Progress Media</h3></div>
+        <div class="mes-card-body">
+          <form id="mediaForm" enctype="multipart/form-data" style="margin-bottom:12px">
+            <input type="hidden" name="action" value="upload_media">
+            <input type="hidden" name="order_id" value="<?= $order_id ?>">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="file" name="file" class="mes-form-input" accept="image/*" required style="flex:1">
+              <input type="text" name="caption" class="mes-form-input" placeholder="Caption" style="flex:1">
+              <button type="submit" class="mes-btn mes-btn-primary mes-btn-sm">Upload</button>
+            </div>
+          </form>
+          <?php if (empty($taskMedia)): ?>
+          <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:8px 0">No media uploaded</p>
+          <?php else: ?>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <?php foreach ($taskMedia as $m): ?>
+            <div style="width:140px">
+              <img src="/public/<?= $m['file_path'] ?>" style="width:100%;height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb">
+              <?php if ($m['caption']): ?>
+              <p style="font-size:11px;color:#6b7280;margin:4px 0 0"><?= htmlspecialchars($m['caption']) ?></p>
+              <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
+    <div class="mes-sidebar-right">
+      <!-- Update Stage -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Update Stage</h3></div>
+        <div class="mes-card-body">
+          <form method="post" action="my_tasks.php">
+            <input type="hidden" name="order_id" value="<?= $order_id ?>">
+            <div class="mes-form-group">
+              <select name="stage" class="mes-form-select">
+                <option value="<?= STAGE_DESIGN_REVIEW ?>" <?= $task['stage']===STAGE_DESIGN_REVIEW?'selected':'' ?>>Design Review</option>
+                <option value="<?= STAGE_MATERIAL_PREP ?>" <?= $task['stage']===STAGE_MATERIAL_PREP?'selected':'' ?>>Material Prep</option>
+                <option value="<?= STAGE_CUTTING ?>" <?= $task['stage']===STAGE_CUTTING?'selected':'' ?>>Cutting</option>
+                <option value="<?= STAGE_PRINTING ?>" <?= $task['stage']===STAGE_PRINTING?'selected':'' ?>>Print/Embroider</option>
+                <option value="<?= STAGE_SEWING ?>" <?= $task['stage']===STAGE_SEWING?'selected':'' ?>>Sewing & Assembly</option>
+              </select>
+            </div>
+            <div class="mes-form-group">
+              <input type="text" name="notes" class="mes-form-input" placeholder="Notes (optional)" value="<?= htmlspecialchars($task['workflow_notes'] ?? '') ?>">
+            </div>
+            <button type="submit" name="update_stage" class="mes-btn mes-btn-primary" style="width:100%">Update</button>
+          </form>
+
+          <?php if ($task['stage'] !== STAGE_QUALITY_INSPECTION): ?>
+          <form method="post" action="my_tasks.php" style="margin-top:8px">
+            <button type="submit" name="submit_qc" value="<?= $order_id ?>" class="mes-btn mes-btn-success" style="width:100%"><i class="fas fa-check"></i> Submit to QC</button>
+          </form>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- QC Status -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">QC Status</h3></div>
+        <div class="mes-card-body">
+          <?php if ($qc): ?>
+          <p style="font-size:13px;margin:0 0 4px">Result: <span class="mes-badge <?= $qc['result']==='Passed'?'mes-badge-success':($qc['result']==='Failed'?'mes-badge-danger':'mes-badge-warning') ?>"><?= $qc['result'] ?? 'Pending' ?></span></p>
+          <?php if ($qc['inspected_at']): ?>
+          <p style="font-size:12px;color:#6b7280;margin:0">Inspected: <?= date('M d, g:i A', strtotime($qc['inspected_at'])) ?></p>
+          <?php endif; ?>
+          <?php if ($qc['feedback']): ?>
+          <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Feedback: <?= htmlspecialchars($qc['feedback']) ?></p>
+          <?php endif; ?>
+          <?php else: ?>
+          <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:8px 0">Not yet submitted to QC</p>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Rework History -->
+      <?php if (!empty($reworkLog)): ?>
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Rework History</h3></div>
+        <div class="mes-card-body">
+          <?php foreach ($reworkLog as $r): ?>
+          <div style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+            <p style="margin:0;font-weight:500"><?= htmlspecialchars($r['from_stage']) ?> → <?= htmlspecialchars($r['to_stage']) ?></p>
+            <p style="margin:2px 0 0;color:#6b7280"><?= htmlspecialchars($r['reason']) ?></p>
+            <p style="margin:2px 0 0;color:#9ca3af"><?= date('M d, g:i A', strtotime($r['created_at'])) ?></p>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif; ?>
+
+      <!-- Garment Tracking -->
+      <div class="mes-card mb-3">
+        <div class="mes-card-header"><h3 class="mes-card-title">Garment Tracking</h3></div>
+        <div class="mes-card-body">
+          <p style="font-size:12px;color:#6b7280;margin-bottom:8px">Per-item stage tracking for this order</p>
+          <a href="garment_tracking.php?order_id=<?= $order_id ?>" class="mes-btn mes-btn-primary mes-btn-sm" style="width:100%"><i class="fas fa-table"></i> View Item Status</a>
+        </div>
+      </div>
+
+      <!-- Customer Info -->
+      <div class="mes-card">
+        <div class="mes-card-header"><h3 class="mes-card-title">Customer</h3></div>
+        <div class="mes-card-body" style="font-size:13px">
+          <p style="margin:0 0 4px"><strong><?= htmlspecialchars($customer['full_name'] ?? 'N/A') ?></strong></p>
+          <p style="margin:0 0 2px;color:#6b7280"><?= htmlspecialchars($customer['email'] ?? '') ?></p>
+          <p style="margin:0;color:#6b7280"><?= htmlspecialchars($customer['phone_number'] ?? '') ?></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Quick note via AJAX
+document.getElementById('noteForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const fd = new FormData(this);
+  const res = await fetch('/controller/production_api.php', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    location.reload();
+  } else {
+    alert('Error: ' + (data.error || 'Unknown'));
+  }
+});
+
+// Media upload
+document.getElementById('mediaForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const fd = new FormData(this);
+  const res = await fetch('/controller/production_api.php', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    location.reload();
+  } else {
+    alert('Error: ' + (data.error || 'Unknown'));
+  }
+});
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

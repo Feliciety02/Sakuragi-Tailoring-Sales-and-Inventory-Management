@@ -10,12 +10,9 @@
   <link rel="stylesheet" href="/public/assets/css/includes.css" />
   <link rel="stylesheet" href="/public/assets/css/tables.css" />
   
-  <script src="/public/assets/js/sidebar.js"></script>
-  <script src="/public/assets/js/tables.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-  <script src="https://unpkg.com/scrollreveal"></script>
+  <script src="/public/assets/js/sidebar.js" defer></script>
+  <script src="/public/assets/js/tables.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 

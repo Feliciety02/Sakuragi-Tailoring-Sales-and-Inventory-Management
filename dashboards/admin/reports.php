@@ -24,7 +24,7 @@ $totalOrders = $pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $pendingOrders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Pending'")->fetchColumn();
 ?>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
 <main class="main-content">
     <h1>Reports & Analytics</h1>
@@ -86,6 +86,6 @@ $pendingOrders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Pendin
     </div>
 </main>
 
-<script src="/assets/js/tables.js"></script>
+<script src="/public/assets/js/tables.js"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

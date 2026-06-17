@@ -17,6 +17,9 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
+CREATE DATABASE IF NOT EXISTS `sakuragi_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `sakuragi_db`;
+
 --
 -- Database: `sakuragi_db`
 --
@@ -1363,6 +1366,133 @@ CREATE TABLE IF NOT EXISTS `submission_files` (
   KEY `submission_id` (`submission_id`),
   CONSTRAINT `submission_files_ibfk_1` FOREIGN KEY (`submission_id`) REFERENCES `work_submissions` (`submission_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ============================================================
+-- MES Upgrade: New production workflow tables
+-- ============================================================
+
+-- QC inspection checklist items per order
+CREATE TABLE IF NOT EXISTS `qc_inspections` (
+  `inspection_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `order_id` bigint(20) NOT NULL,
+  `inspector_id` bigint(20) DEFAULT NULL,
+  `result` enum('Passed','Failed','Pending') DEFAULT 'Pending',
+  `design_accuracy` tinyint(1) DEFAULT 0,
+  `print_alignment` tinyint(1) DEFAULT 0,
+  `embroidery_quality` tinyint(1) DEFAULT 0,
+  `stitching_quality` tinyint(1) DEFAULT 0,
+  `size_accuracy` tinyint(1) DEFAULT 0,
+  `fabric_condition` tinyint(1) DEFAULT 0,
+  `cleanliness` tinyint(1) DEFAULT 0,
+  `packaging_readiness` tinyint(1) DEFAULT 0,
+  `failure_reason` text DEFAULT NULL,
+  `feedback` text DEFAULT NULL,
+  `required_corrections` text DEFAULT NULL,
+  `inspected_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`inspection_id`),
+  KEY `order_id` (`order_id`),
+  KEY `inspector_id` (`inspector_id`),
+  CONSTRAINT `qc_inspections_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`),
+  CONSTRAINT `qc_inspections_ibfk_2` FOREIGN KEY (`inspector_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Rework history tracking
+CREATE TABLE IF NOT EXISTS `rework_log` (
+  `rework_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `order_id` bigint(20) NOT NULL,
+  `triggered_by` bigint(20) DEFAULT NULL,
+  `from_stage` varchar(100) NOT NULL,
+  `to_stage` varchar(100) NOT NULL,
+  `reason` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`rework_id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `rework_log_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Task progress media/photos
+CREATE TABLE IF NOT EXISTS `task_media` (
+  `media_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `order_id` bigint(20) NOT NULL,
+  `employee_id` bigint(20) DEFAULT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `caption` varchar(255) DEFAULT NULL,
+  `media_type` enum('progress','final','qc_evidence') DEFAULT 'progress',
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`media_id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `task_media_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Production notes per order
+CREATE TABLE IF NOT EXISTS `production_notes` (
+  `note_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `order_id` bigint(20) NOT NULL,
+  `author_id` bigint(20) DEFAULT NULL,
+  `content` text NOT NULL,
+  `note_type` enum('general','issue','instruction','handoff') DEFAULT 'general',
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`note_id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `production_notes_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+-- Table structure for table `garment_tracking`
+-- Current stage per order detail item
+--
+CREATE TABLE IF NOT EXISTS `garment_tracking` (
+  `track_id` bigint(20) NOT NULL,
+  `order_detail_id` bigint(20) NOT NULL,
+  `order_id` bigint(20) NOT NULL,
+  `stage` varchar(100) NOT NULL DEFAULT 'Order Received',
+  `employee_id` bigint(20) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`track_id`),
+  KEY `order_detail_id` (`order_detail_id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `garment_tracking_ibfk_1` FOREIGN KEY (`order_detail_id`) REFERENCES `order_details` (`detail_id`),
+  CONSTRAINT `garment_tracking_ibfk_2` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`),
+  CONSTRAINT `garment_tracking_ibfk_3` FOREIGN KEY (`employee_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `garment_log`
+-- Full history of every stage transition per order detail item
+--
+CREATE TABLE IF NOT EXISTS `garment_log` (
+  `log_id` bigint(20) NOT NULL,
+  `order_detail_id` bigint(20) NOT NULL,
+  `order_id` bigint(20) NOT NULL,
+  `from_stage` varchar(100) DEFAULT NULL,
+  `to_stage` varchar(100) NOT NULL,
+  `employee_id` bigint(20) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`log_id`),
+  KEY `order_detail_id` (`order_detail_id`),
+  KEY `order_id` (`order_id`),
+  CONSTRAINT `garment_log_ibfk_1` FOREIGN KEY (`order_detail_id`) REFERENCES `order_details` (`detail_id`),
+  CONSTRAINT `garment_log_ibfk_2` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`),
+  CONSTRAINT `garment_log_ibfk_3` FOREIGN KEY (`employee_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `garment_tracking`
+  MODIFY `track_id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `garment_log`
+  MODIFY `log_id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+-- Modify order_workflow.product_type to support new stages
+ALTER TABLE `order_workflow`
+  MODIFY COLUMN `stage` varchar(100) NOT NULL DEFAULT 'Order Received',
+  ADD COLUMN `priority` enum('low','medium','high','urgent') DEFAULT 'medium' AFTER `product_type`,
+  ADD COLUMN `started_at` datetime DEFAULT NULL AFTER `priority`,
+  ADD COLUMN `completed_at` datetime DEFAULT NULL AFTER `started_at`;
 
 COMMIT;
 

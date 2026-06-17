@@ -1,354 +1,233 @@
 <?php
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
-require_once '../../middleware/auth_required.php'; // Any logged-in user
-require_once '../../config/db_connect.php'; // Add database connection
+require_once __DIR__ . '/../../config/db_connect.php';
+require_once '../../middleware/auth_required.php';
 require_once '../../includes/header.php';
 require_once '../../includes/sidebar_employee.php';
 
-// Protect: If customer somehow reaches employee pages
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
     exit();
 }
 
-// Get currently logged in user's ID
 $user_id = $_SESSION['user_id'];
 
-// Handle filters
-$status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
-$valid_statuses = ['all', 'pending', 'in_progress', 'paused'];
-if (!in_array(strtolower($status_filter), $valid_statuses)) {
-    $status_filter = 'all';
+// Get employee position for stage filtering
+$position = getEmployeePosition($pdo, $user_id);
+$position_id = $position ? (int)$position['position_id'] : 0;
+$allowed_stages = getPositionStages($position_id);
+$stage_placeholders = implode(',', array_fill(0, count($allowed_stages), '?'));
+$stage_params = $allowed_stages;
+
+// Handle "Submit to QC" action (POST from dashboard or inline)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_qc'])) {
+    $order_id = (int)$_POST['submit_qc'];
+    try {
+        $pdo->prepare("UPDATE order_workflow SET stage=?, completed_at=NOW() WHERE order_id=? AND assigned_employee=?")
+            ->execute([STAGE_QUALITY_INSPECTION, $order_id, $user_id]);
+        $pdo->prepare("INSERT INTO production_notes (order_id, author_id, content, note_type) VALUES (?, ?, 'Submitted for quality inspection', 'handoff')")
+            ->execute([$order_id, $user_id]);
+        $chk = $pdo->prepare("SELECT inspection_id FROM qc_inspections WHERE order_id=?");
+        $chk->execute([$order_id]);
+        if (!$chk->fetch()) {
+            $pdo->prepare("INSERT INTO qc_inspections (order_id, result) VALUES (?, 'Pending')")->execute([$order_id]);
+        }
+        $msg = 'Submitted for QC';
+    } catch (Exception $e) {
+        $err = $e->getMessage();
+    }
 }
 
-try {
-    // Base query with DISTINCT to avoid dupes from order_workflow having multiple rows per order
-    $taskSql = "
-        SELECT DISTINCT o.order_id, o.order_date, o.status, o.total_price, 
-               ow.stage, ow.expected_completion, ow.product_type,
-               u.full_name AS customer_name
+// Handle stage update via AJAX-style POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stage'])) {
+    $order_id = (int)$_POST['order_id'];
+    $new_stage = $_POST['stage'] ?? '';
+    $notes = $_POST['notes'] ?? '';
+    try {
+        $pdo->prepare("UPDATE order_workflow SET stage=?, workflow_notes=?, started_at=COALESCE(started_at,NOW()) WHERE order_id=? AND assigned_employee=?")
+            ->execute([$new_stage, $notes, $order_id, $user_id]);
+        if ($notes) {
+            $pdo->prepare("INSERT INTO production_notes (order_id, author_id, content, note_type) VALUES (?, ?, ?, 'general')")
+                ->execute([$order_id, $user_id, $notes]);
+        }
+        $msg = 'Stage updated';
+    } catch (Exception $e) {
+        $err = $e->getMessage();
+    }
+}
+
+$status_filter = $_GET['status'] ?? 'active';
+$valid = ['active', 'qc', 'completed'];
+if (!in_array($status_filter, $valid)) $status_filter = 'active';
+
+$tasks = [];
+if ($status_filter === 'active') {
+    $stmt = $pdo->prepare("
+        SELECT o.order_id, o.order_date, o.status, o.total_price,
+               ow.stage, ow.expected_completion, ow.product_type, ow.priority,
+               u.full_name AS customer_name,
+               (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) as total_qty
         FROM order_workflow ow
         JOIN orders o ON ow.order_id = o.order_id
         JOIN users u ON o.user_id = u.user_id
-        WHERE ow.assigned_employee = ?
-    ";
-
-    // Apply status filter if not 'all'
-    $params = [$user_id];
-    if ($status_filter !== 'all') {
-        if ($status_filter === 'pending') {
-            $taskSql .= " AND o.status = 'Pending'";
-        } elseif ($status_filter === 'in_progress') {
-            $taskSql .= " AND o.status = 'In Progress'";
-        } elseif ($status_filter === 'paused') {
-            $taskSql .= " AND o.status = 'Paused'";
-        }
-    } else {
-        // If 'all', only show active tasks (not completed or cancelled)
-        $taskSql .= " AND o.status NOT IN ('Completed', 'Cancelled')";
-    }
-
-    $taskSql .= ' ORDER BY ow.expected_completion ASC, o.order_date DESC';
-
-    $taskStmt = $pdo->prepare($taskSql);
-    $taskStmt->execute($params);
-    $tasks = $taskStmt->fetchAll();
-} catch (PDOException $e) {
-    // Log the error, don't stop page from loading
-    error_log('My Tasks error: ' . $e->getMessage());
-    $tasks = [];
+        WHERE ow.assigned_employee = ? AND o.status NOT IN ('Completed','Cancelled')
+        AND ow.stage != ? AND ow.stage IN ({$stage_placeholders})
+        ORDER BY CASE ow.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+                 ow.expected_completion ASC
+    ");
+    $stmt->execute(array_merge([$user_id, STAGE_QUALITY_INSPECTION], $stage_params));
+    $tasks = $stmt->fetchAll();
+} elseif ($status_filter === 'qc') {
+    $stmt = $pdo->prepare("
+        SELECT o.order_id, o.order_date, o.status, o.total_price,
+               ow.stage, ow.expected_completion, ow.product_type, ow.priority,
+               u.full_name AS customer_name, qc.result AS qc_result,
+               (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) as total_qty
+        FROM order_workflow ow
+        JOIN orders o ON ow.order_id = o.order_id
+        JOIN users u ON o.user_id = u.user_id
+        LEFT JOIN qc_inspections qc ON o.order_id = qc.order_id
+        WHERE ow.assigned_employee = ? AND ow.stage = ?
+        ORDER BY ow.expected_completion ASC
+    ");
+    $stmt->execute([$user_id, STAGE_QUALITY_INSPECTION]);
+    $tasks = $stmt->fetchAll();
+} else {
+    $stmt = $pdo->prepare("
+        SELECT o.order_id, o.order_date, o.completion_date, o.total_price,
+               ow.stage, ow.product_type,
+               u.full_name AS customer_name,
+               (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) as total_qty
+        FROM order_workflow ow
+        JOIN orders o ON ow.order_id = o.order_id
+        JOIN users u ON o.user_id = u.user_id
+        WHERE ow.assigned_employee = ? AND o.status = 'Completed'
+        ORDER BY o.completion_date DESC LIMIT 20
+    ");
+    $stmt->execute([$user_id]);
+    $tasks = $stmt->fetchAll();
 }
 ?>
-
+<link rel="stylesheet" href="/public/assets/css/mes.css">
 <style>
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-        color: #333;
-        background-color: #fff;
-    }
-    
-    .container {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    
-    .header {
-        margin-bottom: 20px;
-    }
-    
-    h1 {
-        font-size: 28px;
-        font-weight: 600;
-        margin: 0;
-        color: #333;
-    }
-    
-    .subtitle {
-        color: #666;
-        font-size: 16px;
-        margin-top: 5px;
-    }
-    
-    .search-bar {
-        margin-bottom: 15px;
-    }
-    
-    .search-input {
-        width: 100%;
-        max-width: 300px;
-        padding: 10px 15px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-    }
-    
-    .filters {
-        display: flex;
-        margin-bottom: 15px;
-        gap: 10px;
-        justify-content: flex-end;
-    }
-    
-    .filter-button {
-        padding: 8px 16px;
-        background-color: #f5f7fa;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        color: #666;
-        text-decoration: none;
-    }
-    
-    .filter-button.active {
-        background-color: #e5e7eb;
-        color: #333;
-        font-weight: 500;
-    }
-    
-    .filter-button:hover {
-        background-color: #e5e7eb;
-    }
-    
-    .tasks-table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #eaeaea;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    
-    .tasks-table th {
-        text-align: left;
-        padding: 12px 16px;
-        background-color: #f9fafb;
-        font-weight: 500;
-        color: #666;
-        border-bottom: 1px solid #eaeaea;
-    }
-    
-    .tasks-table td {
-        padding: 16px;
-        border-bottom: 1px solid #eaeaea;
-    }
-    
-    .tasks-table tr:hover {
-        background-color: #f1f5f9;
-    }
-    
-    .badge {
-        font-size: 14px;
-        padding: 6px 12px;
-        border-radius: 12px;
-    }
-    
-    .btn {
-        display: inline-block;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        text-align: center;
-        cursor: pointer;
-        transition: background-color 0.3s;
-    }
-    
-    .btn-outline-dark {
-        background-color: transparent;
-        color: #333;
-        border: 1px solid #333;
-    }
-    
-    .btn-outline-dark:hover {
-        background-color: #333;
-        color: #fff;
-    }
-    
-    .btn-link {
-        color: #007bff;
-        text-decoration: none;
-    }
-    
-    .btn-link:hover {
-        text-decoration: underline;
-    }
+  body { background: #f5f5f5; }
+  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
+  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
 </style>
 
-<main class="main-content">
-    <div class="container-fluid mb-4">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="fw-bold">My Tasks</h1>
-                <p class="text-muted">Manage and track your assigned work</p>
-            </div>
-        </div>
+<div class="main-content">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div>
+      <h1 style="font-size:20px;font-weight:700;margin:0">My Tasks</h1>
+      <p style="font-size:13px;color:#6b7280;margin-top:4px"><?= $status_filter === 'active' ? 'Active tasks' : ($status_filter === 'qc' ? 'Pending quality inspection' : 'Completed tasks') ?></p>
     </div>
-    
-    <div class="container-fluid">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <!-- Search and filters -->
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="input-group">
-                            <input type="text" class="form-control" placeholder="Search by ID or garment type..." id="task-search">
-                            <button class="btn btn-outline-secondary" type="button">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                        <div class="btn-group" role="group">
-                            <a href="?status=all" class="btn btn-outline-secondary <?= $status_filter === 'all'
-                                ? 'active'
-                                : '' ?>">All</a>
-                            <a href="?status=pending" class="btn btn-outline-secondary <?= $status_filter === 'pending'
-                                ? 'active'
-                                : '' ?>">Pending</a>
-                            <a href="?status=in_progress" class="btn btn-outline-secondary <?= $status_filter ===
-                            'in_progress'
-                                ? 'active'
-                                : '' ?>">In Progress</a>
-                            <a href="?status=paused" class="btn btn-outline-secondary <?= $status_filter === 'paused'
-                                ? 'active'
-                                : '' ?>">Paused</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tasks table -->
-                <div class="table-responsive">
-                    <table class="table table-hover tasks-table" id="tasks-table">
-                        <thead>
-                            <tr>
-                                <th>Job ID</th>
-                                <th>Garment Type</th>
-                                <th>Deadline</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($tasks)): ?>
-                                <?php foreach ($tasks as $task):
-
-                                    // Convert order_id to job format
-                                    $jobId = 'JOB-' . str_pad($task['order_id'], 4, '0', STR_PAD_LEFT);
-
-                                    // Determine garment type
-                                    $garmentType = $task['product_type'] ?? 'Custom Garment';
-
-                                    // Use expected_completion as deadline
-                                    $deadline = $task['expected_completion']
-                                        ? date('M d, Y', strtotime($task['expected_completion']))
-                                        : date('M d, Y', strtotime('+7 days', strtotime($task['order_date'])));
-                                    ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($jobId) ?></td>
-                                    <td><?= htmlspecialchars($garmentType) ?></td>
-                                    <td><?= htmlspecialchars($deadline) ?></td>
-                                    <td>
-                                        <?php
-                                        $statusClass = '';
-                                        $iconClass = '';
-                                        switch ($task['status']) {
-                                            case 'Pending':
-                                                $statusClass = 'bg-light text-dark border';
-                                                $iconClass = 'far fa-clock';
-                                                break;
-                                            case 'In Progress':
-                                                $statusClass = 'bg-primary text-white';
-                                                $iconClass = 'fas fa-spinner fa-spin';
-                                                break;
-                                            case 'Paused':
-                                                $statusClass = 'bg-danger text-white';
-                                                $iconClass = 'fas fa-pause';
-                                                break;
-                                            default:
-                                                $statusClass = 'bg-secondary text-white';
-                                                $iconClass = 'far fa-question-circle';
-                                        }
-                                        ?>
-                                        <span class="badge rounded-pill <?= $statusClass ?> px-3 py-2">
-                                            <i class="<?= $iconClass ?> me-1"></i> <?= htmlspecialchars(
-     $task['status']
- ) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <a href="view_task.php?id=<?= $task[
-                                            'order_id'
-                                        ] ?>" class="btn btn-sm btn-outline-dark">
-                                            <i class="fas fa-play me-1"></i> Start Task
-                                        </a>
-                                        <a href="view_order.php?id=<?= $task[
-                                            'order_id'
-                                        ] ?>" class="btn btn-sm btn-link text-decoration-none">
-                                            <i class="fas fa-file-alt"></i> Files
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php
-                                endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center py-5">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <i class="fas fa-tasks fs-1 text-muted mb-3"></i>
-                                            <p class="text-muted mb-0">No tasks found</p>
-                                            <?php if ($status_filter !== 'all'): ?>
-                                                <a href="?status=all" class="btn btn-sm btn-outline-primary mt-2">Show all tasks</a>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div class="d-flex gap-2">
+      <a href="?status=active" class="mes-btn mes-btn-sm <?= $status_filter === 'active' ? 'mes-btn-primary' : '' ?>">Active</a>
+      <a href="?status=qc" class="mes-btn mes-btn-sm <?= $status_filter === 'qc' ? 'mes-btn-primary' : '' ?>">QC</a>
+      <a href="?status=completed" class="mes-btn mes-btn-sm <?= $status_filter === 'completed' ? 'mes-btn-primary' : '' ?>">Completed</a>
     </div>
-</main>
+  </div>
+
+  <div style="margin-bottom:16px">
+    <div style="display:flex;gap:8px;max-width:400px">
+      <input type="text" id="taskSearch" class="mes-form-input" placeholder="Search by order #, customer, or product..." style="flex:1">
+      <button class="mes-btn mes-btn-primary mes-btn-sm" onclick="filterTasks()"><i class="fas fa-search"></i></button>
+    </div>
+  </div>
+
+  <?php if (isset($msg)): ?>
+  <div class="mes-card mb-3" style="padding:12px 20px;background:#d1fae5;border-color:#a7f3d0"><p style="margin:0;font-size:13px;color:#065f46"><?= htmlspecialchars($msg) ?></p></div>
+  <?php endif; ?>
+  <?php if (isset($err)): ?>
+  <div class="mes-card mb-3" style="padding:12px 20px;background:#fef2f2;border-color:#fecaca"><p style="margin:0;font-size:13px;color:#991b1b"><?= htmlspecialchars($err) ?></p></div>
+  <?php endif; ?>
+
+  <?php if (empty($tasks)): ?>
+  <div class="mes-card"><div class="mes-card-body"><p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:32px 0">No tasks found</p></div></div>
+  <?php else: ?>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
+    <?php foreach ($tasks as $t): $pct = getStageProgress($t['stage']); ?>
+    <div class="mes-card" id="task-card-<?= $t['order_id'] ?>" style="border-left:3px solid <?= ($t['priority']??'medium') === 'urgent' ? 'var(--mes-danger)' : (($t['priority']??'medium') === 'high' ? 'var(--mes-warning)' : 'var(--mes-info)') ?>">
+      <div class="mes-card-body" style="padding:16px">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <strong style="font-size:14px">#ORD-<?= $t['order_id'] ?></strong>
+            <?php if (isset($t['priority'])): ?>
+            <span class="mes-badge <?= $t['priority'] === 'urgent' ? 'mes-badge-danger' : ($t['priority'] === 'high' ? 'mes-badge-warning' : 'mes-badge-gray') ?> ms-1"><?= ucfirst($t['priority']) ?></span>
+            <?php endif; ?>
+            <?php if (isset($t['qc_result'])): ?>
+            <span class="mes-badge <?= $t['qc_result'] === 'Passed' ? 'mes-badge-success' : ($t['qc_result'] === 'Failed' ? 'mes-badge-danger' : 'mes-badge-warning') ?> ms-1"><?= $t['qc_result'] ?? 'Pending' ?></span>
+            <?php endif; ?>
+          </div>
+          <?php if ($status_filter !== 'completed'): ?>
+          <div class="dropdown" style="position:relative">
+            <button class="mes-btn mes-btn-sm" style="padding:2px 8px" onclick="this.nextElementSibling.classList.toggle('show')">⋮</button>
+            <div class="mes-dropdown">
+              <form method="post" style="padding:8px;min-width:200px">
+                <input type="hidden" name="order_id" value="<?= $t['order_id'] ?>">
+                <div class="mes-form-group mb-1">
+                  <select name="stage" class="mes-form-select mes-form-select-sm">
+                    <option value="<?= STAGE_DESIGN_REVIEW ?>" <?= $t['stage']===STAGE_DESIGN_REVIEW?'selected':'' ?>>Design Review</option>
+                    <option value="<?= STAGE_MATERIAL_PREP ?>" <?= $t['stage']===STAGE_MATERIAL_PREP?'selected':'' ?>>Material Prep</option>
+                    <option value="<?= STAGE_CUTTING ?>" <?= $t['stage']===STAGE_CUTTING?'selected':'' ?>>Cutting</option>
+                    <option value="<?= STAGE_PRINTING ?>" <?= $t['stage']===STAGE_PRINTING?'selected':'' ?>>Print/Embroider</option>
+                    <option value="<?= STAGE_SEWING ?>" <?= $t['stage']===STAGE_SEWING?'selected':'' ?>>Sewing & Assembly</option>
+                  </select>
+                </div>
+                <div class="mes-form-group mb-1">
+                  <input type="text" name="notes" class="mes-form-input mes-form-input-sm" placeholder="Notes (optional)">
+                </div>
+                <button type="submit" name="update_stage" class="mes-btn mes-btn-primary mes-btn-sm" style="width:100%">Update</button>
+              </form>
+              <hr style="margin:4px 0">
+              <form method="post">
+                <button type="submit" name="submit_qc" value="<?= $t['order_id'] ?>" class="mes-btn mes-btn-success mes-btn-sm" style="width:100%">Submit to QC</button>
+              </form>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+
+        <p style="font-size:13px;margin:0;color:#374151"><?= htmlspecialchars($t['product_type'] ?? 'Custom Garment') ?></p>
+        <p style="font-size:12px;color:#6b7280;margin:2px 0 8px"><?= htmlspecialchars($t['customer_name']) ?> · Qty: <?= $t['total_qty'] ?? 0 ?></p>
+
+        <?php if ($status_filter !== 'completed'): ?>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
+            <div style="width:<?= $pct ?>%;height:100%;background:<?= $t['priority']==='urgent'?'var(--mes-danger)':($t['priority']==='high'?'var(--mes-warning)':'var(--mes-primary)') ?>;border-radius:3px;transition:width .3s"></div>
+          </div>
+          <span style="font-size:11px;color:#6b7280;white-space:nowrap"><?= $pct ?>%</span>
+        </div>
+        <?php endif; ?>
+
+        <div class="d-flex gap-2">
+          <a href="view_task.php?id=<?= $t['order_id'] ?>" class="mes-btn mes-btn-primary mes-btn-sm"><i class="fas fa-arrow-right"></i> View</a>
+        </div>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+</div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('task-search');
-    const tasksTable = document.getElementById('tasks-table');
-    
-    if (searchInput && tasksTable) {
-        searchInput.addEventListener('keyup', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = tasksTable.querySelectorAll('tbody tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
-            });
-        });
-    }
+document.addEventListener('click', function(e) {
+  document.querySelectorAll('.mes-dropdown.show').forEach(d => {
+    if (!d.parentElement.contains(e.target)) d.classList.remove('show');
+  });
+});
+
+function filterTasks() {
+  var q = document.getElementById('taskSearch').value.toLowerCase();
+  document.querySelectorAll('[id^="task-card-"]').forEach(function(c) {
+    c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+document.getElementById('taskSearch').addEventListener('keyup', function(e) {
+  if (e.key === 'Enter') filterTasks();
+  else filterTasks();
 });
 </script>
 

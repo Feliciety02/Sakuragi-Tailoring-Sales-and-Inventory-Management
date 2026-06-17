@@ -44,8 +44,8 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QC Dashboard - Senior Tailor</title>
-    <link rel="stylesheet" href="../public/assets/css/enhanced-sidebar.css">
-    <script src="../public/assets/js/enhanced-sidebar.js"></script>
+    <link rel="stylesheet" href="/public/assets/css/enhanced-sidebar.css">
+    <script src="/public/assets/js/enhanced-sidebar.js"></script>
   
 </head>
 <body>
