@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../dao/InventoryDAO.php';
 
 function getInventory($pdo) {
   $stmt = $pdo->prepare("
@@ -77,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'stock_in' || $action === 'stock_out') {
     $id = $_POST['inventory_id'];
     $quantity = (int) $_POST['quantity'];
+    $supplier_id = !empty($_POST['stock_supplier_id']) ? (int)$_POST['stock_supplier_id'] : null;
 
     $stmt = $pdo->prepare("SELECT quantity FROM inventory WHERE inventory_id = :id");
     $stmt->execute(['id' => $id]);
@@ -86,6 +88,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare("UPDATE inventory SET quantity = :qty WHERE inventory_id = :id");
     $stmt->execute(['qty' => $newQty, 'id' => $id]);
+
+    $dao = new InventoryDAO($pdo);
+    $dao->logStockChange($id, $action === 'stock_in' ? 'in' : 'out', $quantity, $supplier_id);
   }
 
   header('Location: ../dashboards/admin/inventory.php');
