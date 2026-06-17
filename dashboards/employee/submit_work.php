@@ -82,26 +82,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Begin transaction
                 $pdo->beginTransaction();
 
-                // Save submission record
-                $submissionSql = "
-                    INSERT INTO work_submissions (order_id, employee_id, notes, submission_date)
-                    VALUES (?, ?, ?, NOW())
-                ";
-                $submissionStmt = $pdo->prepare($submissionSql);
-                $submissionStmt->execute([$selectedTask, $user_id, $notes]);
-                $submissionId = $pdo->lastInsertId();
-
-                // Save uploaded files
-                if (!empty($uploadedFiles)) {
-                    $fileSql = "
-                        INSERT INTO submission_files (submission_id, file_path)
-                        VALUES (?, ?)
+                // Save submission record (if work_submissions table exists, try it)
+                try {
+                    $submissionSql = "
+                        INSERT INTO work_submissions (order_id, employee_id, notes, submission_date)
+                        VALUES (?, ?, ?, NOW())
                     ";
-                    $fileStmt = $pdo->prepare($fileSql);
+                    $submissionStmt = $pdo->prepare($submissionSql);
+                    $submissionStmt->execute([$selectedTask, $user_id, $notes]);
+                    $submissionId = $pdo->lastInsertId();
 
-                    foreach ($uploadedFiles as $file) {
-                        $fileStmt->execute([$submissionId, $file]);
+                    // Save uploaded files
+                    if (!empty($uploadedFiles)) {
+                        $fileSql = "
+                            INSERT INTO submission_files (submission_id, file_path)
+                            VALUES (?, ?)
+                        ";
+                        $fileStmt = $pdo->prepare($fileSql);
+
+                        foreach ($uploadedFiles as $file) {
+                            $fileStmt->execute([$submissionId, $file]);
+                        }
                     }
+                } catch (PDOException $e) {
+                    error_log('work_submissions table not available: ' . $e->getMessage());
                 }
 
                 // Update order status to 'Completed'

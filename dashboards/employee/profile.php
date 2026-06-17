@@ -91,21 +91,27 @@ try {
     $monthStatsStmt->execute([$user_id, $user_id, $startOfMonth, $endOfMonth]);
     $monthStats = $monthStatsStmt->fetch();
 
-    // Quality rate
-    $qualitySql = "
-        SELECT 
-            COUNT(ws.submission_id) AS total_submissions,
-            COUNT(CASE WHEN ws.status = 'Passed' THEN 1 END) AS passed_count
-        FROM work_submissions ws
-        WHERE ws.employee_id = ?
-        AND ws.submission_date >= ?
-    ";
-    $qualityStmt = $pdo->prepare($qualitySql);
-    $qualityStmt->execute([$user_id, $startOfMonth]);
-    $qualityStats = $qualityStmt->fetch();
+    // Quality rate (gracefully handle missing work_submissions table)
+    $totalSubmissions = 0;
+    $passRate = 95;
+    try {
+        $qualitySql = "
+            SELECT 
+                COUNT(ws.submission_id) AS total_submissions,
+                COUNT(CASE WHEN ws.status = 'Passed' THEN 1 END) AS passed_count
+            FROM work_submissions ws
+            WHERE ws.employee_id = ?
+            AND ws.submission_date >= ?
+        ";
+        $qualityStmt = $pdo->prepare($qualitySql);
+        $qualityStmt->execute([$user_id, $startOfMonth]);
+        $qualityStats = $qualityStmt->fetch();
+        $totalSubmissions = $qualityStats['total_submissions'] ?? 0;
+        $passRate = $totalSubmissions > 0 ? round(($qualityStats['passed_count'] / $totalSubmissions) * 100) : 95;
+    } catch (PDOException $e) {
+        error_log('Quality stats unavailable: ' . $e->getMessage());
+    }
 
-    $totalSubmissions = $qualityStats['total_submissions'] ?? 0;
-    $passRate = $totalSubmissions > 0 ? round(($qualityStats['passed_count'] / $totalSubmissions) * 100) : 95; // Default to 95% if no submissions
 } catch (PDOException $e) {
     error_log('Profile error: ' . $e->getMessage());
     $user = [];
@@ -114,6 +120,7 @@ try {
     $weekStats = ['assigned_count' => 0, 'completed_count' => 0];
     $monthStats = ['assigned_count' => 0, 'completed_count' => 0];
     $passRate = 0;
+    $totalSubmissions = 0;
 }
 
 // Handle password change
@@ -172,13 +179,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     } else {
         try {
             // Update profile information
-            $updateProfileSql = 'UPDATE users SET email = ?, phone = ? WHERE user_id = ?';
+            $updateProfileSql = 'UPDATE users SET email = ?, phone_number = ? WHERE user_id = ?';
             $updateProfileStmt = $pdo->prepare($updateProfileSql);
             $updateProfileStmt->execute([$email, $phone, $user_id]);
 
             // Update user variable with new values
             $user['email'] = $email;
-            $user['phone'] = $phone;
+            $user['phone_number'] = $phone;
 
             $profileMessage = 'Profile updated successfully';
         } catch (PDOException $e) {
@@ -393,7 +400,7 @@ $employeeId = 'EMP-' . str_pad($user_id, 4, '0', STR_PAD_LEFT);
                                             <div class="mb-3">
                                                 <label for="phone" class="form-label">Phone Number</label>
                                                 <input type="tel" class="form-control" id="phone" name="phone" value="<?= htmlspecialchars(
-                                                    $user['phone'] ?? ''
+                                                    $user['phone_number'] ?? ''
                                                 ) ?>">
                                             </div>
                                             <div class="mb-3">

@@ -1309,6 +1309,32 @@ ALTER TABLE `payments`
   ADD COLUMN `reference_number` varchar(100) DEFAULT NULL AFTER `status`,
   ADD COLUMN `proof_file_path` text DEFAULT NULL AFTER `reference_number`;
 
+-- Work submission tables (employee QC workflow)
+CREATE TABLE IF NOT EXISTS `work_submissions` (
+  `submission_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `order_id` bigint(20) NOT NULL,
+  `employee_id` bigint(20) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `status` enum('Pending','Passed','Failed','Reopened') DEFAULT 'Pending',
+  `feedback` text DEFAULT NULL,
+  `submission_date` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`submission_id`),
+  KEY `order_id` (`order_id`),
+  KEY `employee_id` (`employee_id`),
+  CONSTRAINT `work_submissions_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`),
+  CONSTRAINT `work_submissions_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `submission_files` (
+  `file_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `submission_id` bigint(20) NOT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `upload_date` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`file_id`),
+  KEY `submission_id` (`submission_id`),
+  CONSTRAINT `submission_files_ibfk_1` FOREIGN KEY (`submission_id`) REFERENCES `work_submissions` (`submission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

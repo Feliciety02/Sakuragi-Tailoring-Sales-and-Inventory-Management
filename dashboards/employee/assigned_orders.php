@@ -20,34 +20,10 @@ if (get_user_role() === ROLE_CUSTOMER) {
 // Get currently logged in user's ID
 $user_id = $_SESSION['user_id'];
 
-// First, let's check the structure of the users table
 try {
-    $checkTableStmt = $pdo->prepare('DESCRIBE users');
-    $checkTableStmt->execute();
-    $columns = $checkTableStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    // Determine which customer name fields exist
-    $hasFirstName = in_array('first_name', $columns);
-    $hasLastName = in_array('last_name', $columns);
-    $hasName = in_array('name', $columns);
-    $hasFullName = in_array('full_name', $columns);
-
-    // Build the SQL query based on available columns
-    $nameFields = '';
-    if ($hasFirstName && $hasLastName) {
-        $nameFields = 'u.first_name, u.last_name';
-    } elseif ($hasFullName) {
-        $nameFields = 'u.full_name';
-    } elseif ($hasName) {
-        $nameFields = 'u.name';
-    } else {
-        // Fallback to user_id if no name columns exist
-        $nameFields = 'u.user_id as customer_name';
-    }
-
     $sql = "
-        SELECT o.order_id, o.order_date, o.status, o.total_price, ow.stage, ow.expected_completion,
-               $nameFields
+        SELECT DISTINCT o.order_id, o.order_date, o.status, o.total_price, ow.stage, ow.expected_completion,
+               u.full_name AS customer_name
         FROM order_workflow ow
         JOIN orders o ON ow.order_id = o.order_id
         JOIN users u ON o.user_id = u.user_id
@@ -86,15 +62,7 @@ try {
                     <?php foreach ($result as $row): ?>
                         <tr>
                             <td><?= htmlspecialchars($row['order_id']) ?></td>
-                            <td><?php if (isset($row['first_name']) && isset($row['last_name'])) {
-                                echo htmlspecialchars($row['first_name'] . ' ' . $row['last_name']);
-                            } elseif (isset($row['full_name'])) {
-                                echo htmlspecialchars($row['full_name']);
-                            } elseif (isset($row['name'])) {
-                                echo htmlspecialchars($row['name']);
-                            } else {
-                                echo 'Customer #' . htmlspecialchars($row['customer_name'] ?? 'Unknown');
-                            } ?></td>
+                            <td><?= htmlspecialchars($row['customer_name'] ?? 'Unknown') ?></td>
                             <td><?= htmlspecialchars(date('M d, Y', strtotime($row['order_date']))) ?></td>
                             <td><?= htmlspecialchars($row['stage']) ?></td>
                             <td>

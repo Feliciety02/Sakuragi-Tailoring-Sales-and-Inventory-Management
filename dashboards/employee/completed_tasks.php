@@ -23,24 +23,43 @@ if (!in_array($filter, $valid_filters)) {
 }
 
 try {
-    // Base query
-    $taskSql = "
-        SELECT o.order_id, o.order_date, o.status, o.completion_date, 
-               ws.notes, ws.status AS qc_status, ws.feedback,
-               ow.product_type
-        FROM orders o
-        JOIN order_workflow ow ON o.order_id = ow.order_id
-        LEFT JOIN work_submissions ws ON o.order_id = ws.order_id AND ws.employee_id = ?
-        WHERE ow.assigned_employee = ?
-        AND o.status IN ('Completed', 'Reviewed')
-    ";
+    // Check if work_submissions table exists
+    $hasWorkSubmissions = false;
+    try {
+        $checkWs = $pdo->query("SELECT 1 FROM work_submissions LIMIT 1");
+        $hasWorkSubmissions = true;
+    } catch (PDOException $e) {
+        $hasWorkSubmissions = false;
+    }
 
-    // Apply filters
-    $params = [$user_id, $user_id];
-    if ($filter === 'passed') {
-        $taskSql .= " AND (ws.status = 'Passed' OR o.status = 'Completed')";
-    } elseif ($filter === 'failed') {
-        $taskSql .= " AND ws.status = 'Failed'";
+    if ($hasWorkSubmissions) {
+        $taskSql = "
+            SELECT o.order_id, o.order_date, o.status, o.completion_date, 
+                   ws.notes, ws.status AS qc_status, ws.feedback,
+                   ow.product_type
+            FROM orders o
+            JOIN order_workflow ow ON o.order_id = ow.order_id
+            LEFT JOIN work_submissions ws ON o.order_id = ws.order_id AND ws.employee_id = ?
+            WHERE ow.assigned_employee = ?
+            AND o.status = 'Completed'
+        ";
+        $params = [$user_id, $user_id];
+        if ($filter === 'passed') {
+            $taskSql .= " AND (ws.status = 'Passed' OR ws.status IS NULL)";
+        } elseif ($filter === 'failed') {
+            $taskSql .= " AND ws.status = 'Failed'";
+        }
+    } else {
+        $taskSql = "
+            SELECT o.order_id, o.order_date, o.status, o.completion_date, 
+                   NULL AS notes, NULL AS qc_status, NULL AS feedback,
+                   ow.product_type
+            FROM orders o
+            JOIN order_workflow ow ON o.order_id = ow.order_id
+            WHERE ow.assigned_employee = ?
+            AND o.status = 'Completed'
+        ";
+        $params = [$user_id];
     }
 
     $taskSql .= ' ORDER BY o.completion_date DESC, o.order_date DESC';
@@ -70,12 +89,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reopen_task'])) {
             $updateOrderStmt = $pdo->prepare($updateOrderSql);
             $updateOrderStmt->execute([$taskId]);
 
-            // Update submission status
-            $updateSubSql = "
-                UPDATE work_submissions SET status = 'Reopened' WHERE order_id = ? AND employee_id = ?
-            ";
-            $updateSubStmt = $pdo->prepare($updateSubSql);
-            $updateSubStmt->execute([$taskId, $user_id]);
+            // Update submission status (if table exists)
+            try {
+                $updateSubSql = "
+                    UPDATE work_submissions SET status = 'Reopened' WHERE order_id = ? AND employee_id = ?
+                ";
+                $updateSubStmt = $pdo->prepare($updateSubSql);
+                $updateSubStmt->execute([$taskId, $user_id]);
+            } catch (PDOException $e) {
+                error_log('work_submissions not available: ' . $e->getMessage());
+            }
 
             // Commit transaction
             $pdo->commit();

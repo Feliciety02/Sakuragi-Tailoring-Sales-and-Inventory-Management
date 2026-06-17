@@ -23,35 +23,11 @@ if (!in_array(strtolower($status_filter), $valid_statuses)) {
 }
 
 try {
-    // Check the structure of the users table
-    $checkTableStmt = $pdo->prepare('DESCRIBE users');
-    $checkTableStmt->execute();
-    $columns = $checkTableStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    // Determine which customer name fields exist
-    $hasFirstName = in_array('first_name', $columns);
-    $hasLastName = in_array('last_name', $columns);
-    $hasName = in_array('name', $columns);
-    $hasFullName = in_array('full_name', $columns);
-
-    // Build the SQL query based on available columns
-    $nameFields = '';
-    if ($hasFirstName && $hasLastName) {
-        $nameFields = 'u.first_name, u.last_name';
-    } elseif ($hasFullName) {
-        $nameFields = 'u.full_name';
-    } elseif ($hasName) {
-        $nameFields = 'u.name';
-    } else {
-        // Fallback to user_id if no name columns exist
-        $nameFields = 'u.user_id as customer_name';
-    }
-
-    // Base query
+    // Base query with DISTINCT to avoid dupes from order_workflow having multiple rows per order
     $taskSql = "
-        SELECT o.order_id, o.order_date, o.status, o.total_price, 
+        SELECT DISTINCT o.order_id, o.order_date, o.status, o.total_price, 
                ow.stage, ow.expected_completion, ow.product_type,
-               $nameFields
+               u.full_name AS customer_name
         FROM order_workflow ow
         JOIN orders o ON ow.order_id = o.order_id
         JOIN users u ON o.user_id = u.user_id

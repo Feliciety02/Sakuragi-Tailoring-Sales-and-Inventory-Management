@@ -27,12 +27,12 @@ try {
     // Fetch task details
     $taskSql = "
         SELECT o.order_id, o.order_date, o.status, o.expected_completion, 
-               o.total_price, o.special_instructions, o.customer_notes,
+               o.total_price,
                ow.stage, ow.product_type, ow.workflow_notes, ow.assigned_employee,
                s.service_id, s.service_name, s.category AS service_category
         FROM orders o
         JOIN order_workflow ow ON o.order_id = ow.order_id
-        LEFT JOIN services s ON ow.service_id = s.service_id
+        LEFT JOIN services s ON o.service_id = s.service_id
         WHERE o.order_id = ?
         AND ow.assigned_employee = ?
     ";
@@ -70,7 +70,7 @@ try {
     // Count total items for this order
     $itemsSql = "
         SELECT SUM(quantity) as total_items
-        FROM order_items
+        FROM order_details
         WHERE order_id = ?
     ";
     $itemsStmt = $pdo->prepare($itemsSql);
@@ -80,7 +80,7 @@ try {
     // Get size breakdown
     $sizesSql = "
         SELECT size, quantity
-        FROM order_items
+        FROM order_details
         WHERE order_id = ?
     ";
     $sizesStmt = $pdo->prepare($sizesSql);
@@ -324,14 +324,14 @@ try {
                             </div>
                         </div>
                         
-                        <!-- Special Instructions -->
+                        <!-- Workflow Notes -->
                         <div class="mb-0">
-                            <h6 class="text-muted mb-2">Special Instructions</h6>
+                            <h6 class="text-muted mb-2">Workflow Notes</h6>
                             <div class="p-3 bg-light rounded">
-                                <?php if (!empty($task['special_instructions'])): ?>
-                                <p class="mb-0"><?= nl2br(htmlspecialchars($task['special_instructions'])) ?></p>
+                                <?php if (!empty($task['workflow_notes'])): ?>
+                                <p class="mb-0"><?= nl2br(htmlspecialchars($task['workflow_notes'])) ?></p>
                                 <?php else: ?>
-                                <p class="text-muted mb-0">No special instructions provided.</p>
+                                <p class="text-muted mb-0">No workflow notes added yet.</p>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -471,11 +471,11 @@ STAGE_QUALITY_CHECK
                             ) ?></p>
                         </div>
                         
-                        <?php if (!empty($task['customer_notes'])): ?>
+                        <?php if (!empty($customer['notes'])): ?>
                         <div class="mt-4">
                             <h6 class="text-muted mb-2">Customer Notes</h6>
                             <div class="p-3 bg-light rounded">
-                                <p class="mb-0"><?= nl2br(htmlspecialchars($task['customer_notes'])) ?></p>
+                                <p class="mb-0"><?= nl2br(htmlspecialchars($customer['notes'])) ?></p>
                             </div>
                         </div>
                         <?php endif; ?>
