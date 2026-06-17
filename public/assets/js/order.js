@@ -10,7 +10,7 @@ function viewOrder(orderId) {
         </div>
     `;
 
-    fetch(`/api/order_details.php?order_id=${orderId}`)
+    fetch(`/dashboards/customer/fetch_order_details.php?id=${orderId}`)
         .then(response => {
             if (!response.ok) throw new Error('Failed to fetch');
 

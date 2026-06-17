@@ -6,10 +6,10 @@ $serviceId = $_SESSION['selected_service_id'] ?? $_POST['service_id'] ?? null;
 $unitPrice = 0;
 
 if ($serviceId) {
-    $stmt = $pdo->prepare('SELECT price FROM services WHERE service_id = ?');
+    $stmt = $pdo->prepare('SELECT service_price FROM services WHERE service_id = ?');
     $stmt->execute([$serviceId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $unitPrice = $row['price'] ?? 0;
+    $unitPrice = $row['service_price'] ?? 0;
 }
 ?>
 

@@ -1290,6 +1290,25 @@ ALTER TABLE `supplier_supplies`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`branch_id`);
+
+-- Schema fixes: add columns expected by the application code
+ALTER TABLE `orders`
+  ADD COLUMN `service_id` bigint(20) DEFAULT NULL AFTER `user_id`,
+  ADD COLUMN `design_file_id` bigint(20) DEFAULT NULL AFTER `service_id`,
+  ADD COLUMN `completion_date` datetime DEFAULT NULL AFTER `expected_completion`;
+
+ALTER TABLE `order_details`
+  ADD COLUMN `size` varchar(20) DEFAULT NULL AFTER `order_detail_id`,
+  ADD COLUMN `service_id` bigint(20) DEFAULT NULL AFTER `size`,
+  MODIFY COLUMN `product_id` bigint(20) DEFAULT NULL;
+
+ALTER TABLE `order_workflow`
+  ADD COLUMN `product_type` varchar(100) DEFAULT NULL AFTER `stage`;
+
+ALTER TABLE `payments`
+  ADD COLUMN `reference_number` varchar(100) DEFAULT NULL AFTER `status`,
+  ADD COLUMN `proof_file_path` text DEFAULT NULL AFTER `reference_number`;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

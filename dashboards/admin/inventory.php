@@ -10,23 +10,6 @@ require_once __DIR__ . '/../../controller/InventoryController.php';
 $inventoryItems = getInventory($pdo);
 $suppliers = getSuppliers($pdo);
 $types = getSupplyTypes($pdo);
-
-$stmt = $pdo->prepare("
-  SELECT 
-    i.inventory_id,
-    i.item_name,
-    i.quantity,
-    i.reorder_level,
-    i.last_updated,
-    s.supplier_name,
-    t.name AS supply_type
-  FROM inventory i
-  LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
-  LEFT JOIN supply_types t ON i.supply_type_id = t.supply_type_id
-  WHERE i.branch_id = 2
-  ORDER BY i.last_updated DESC
-");
-
 ?>
 
 <link rel="stylesheet" href="/../public/assets/css/adminInventory.css" />
