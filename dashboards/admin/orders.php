@@ -1,12 +1,22 @@
 <?php
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
+require_once __DIR__ . '/../../config/db_connect.php';
 require_once '../../middleware/role_admin_only.php';
 require_once '../../includes/header.php';
 require_once '../../includes/sidebar_admin.php';
+
+$stmt = $pdo->query("
+    SELECT o.order_id, u.full_name, o.order_date, o.total_price, o.status, o.payment_status,
+           s.service_name
+    FROM orders o
+    JOIN users u ON o.user_id = u.user_id
+    LEFT JOIN services s ON o.service_id = s.service_id
+    ORDER BY o.order_date DESC
+");
+$orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<!-- Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
 <main class="main-content">
@@ -43,44 +53,53 @@ require_once '../../includes/sidebar_admin.php';
                 <tr>
                     <th onclick="sortTableByColumn('orderTable', 0)">Order #</th>
                     <th onclick="sortTableByColumn('orderTable', 1)">Customer</th>
-                    <th onclick="sortTableByColumn('orderTable', 2)">Date</th>
-                    <th onclick="sortTableByColumn('orderTable', 3)">Total</th>
-                    <th onclick="sortTableByColumn('orderTable', 4)">Status</th>
-                    <th onclick="sortTableByColumn('orderTable', 5)">Payment</th>
+                    <th onclick="sortTableByColumn('orderTable', 2)">Service</th>
+                    <th onclick="sortTableByColumn('orderTable', 3)">Date</th>
+                    <th onclick="sortTableByColumn('orderTable', 4)">Total</th>
+                    <th onclick="sortTableByColumn('orderTable', 5)">Status</th>
+                    <th onclick="sortTableByColumn('orderTable', 6)">Payment</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>#1023</td>
-                    <td>Maria Santos</td>
-                    <td>Apr 28, 2025</td>
-                    <td>₱1,250.00</td>
-                    <td><span class="status hired">Completed</span></td>
-                    <td>Paid</td>
-                    <td class="action-buttons">
-                        <button class="view"><i class="fas fa-eye"></i></button>
-                        <button class="delete"><i class="fas fa-times"></i></button>
-                    </td>
-                </tr>
-                <tr>
-                    <td>#1022</td>
-                    <td>Juan Dela Cruz</td>
-                    <td>Apr 27, 2025</td>
-                    <td>₱980.00</td>
-                    <td><span class="status employed">Pending</span></td>
-                    <td>Unpaid</td>
-                    <td class="action-buttons">
-                        <button class="view"><i class="fas fa-eye"></i></button>
-                        <button class="delete"><i class="fas fa-times"></i></button>
-                    </td>
-                </tr>
+                <?php if (empty($orders)): ?>
+                    <tr><td colspan="8" class="text-center">No orders found.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($orders as $order): ?>
+                    <tr>
+                        <td>#<?= $order['order_id'] ?></td>
+                        <td><?= htmlspecialchars($order['full_name']) ?></td>
+                        <td><?= htmlspecialchars($order['service_name'] ?? 'N/A') ?></td>
+                        <td><?= date('M d, Y', strtotime($order['order_date'])) ?></td>
+                        <td>₱<?= number_format($order['total_price'], 2) ?></td>
+                        <td><span class="badge <?= strtolower($order['status']) ?>"><?= $order['status'] ?></span></td>
+                        <td><span class="badge <?= strtolower($order['payment_status']) ?>"><?= $order['payment_status'] ?></span></td>
+                        <td class="action-buttons">
+                            <button class="view" onclick="viewOrder(<?= $order['order_id'] ?>)"><i class="fas fa-eye"></i></button>
+                            <button class="delete" onclick="deleteOrder(<?= $order['order_id'] ?>)"><i class="fas fa-times"></i></button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
 </main>
 
-<!-- Central table JS logic -->
 <script src="/assets/js/tables.js"></script>
+<script>
+function viewOrder(id) {
+    window.location.href = '/dashboards/customer/view_order.php?id=' + id;
+}
+function deleteOrder(id) {
+    if (confirm('Cancel order #' + id + '?')) {
+        fetch('/controller/update_order.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'order_id=' + id + '&action=cancel'
+        }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
+    }
+}
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>
