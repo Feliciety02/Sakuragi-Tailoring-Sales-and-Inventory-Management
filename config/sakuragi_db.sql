@@ -1328,6 +1328,10 @@ INSERT IGNORE INTO `shop_settings` (setting_key, setting_value) VALUES
 ('facebook_link', 'https://facebook.com/sakuragi.shop'),
 ('instagram_link', 'https://instagram.com/sakuragi.shop');
 
+-- Seed admin user (password: admin123)
+INSERT IGNORE INTO `users` (`full_name`, `email`, `password`, `phone_number`, `role`, `branch_id`, `status`) VALUES
+('Admin', 'admin@sakuragi.ph', '$2y$10$bD9hFDc/fWS4EgwncDrPXeTJfI1z1N5PzLCo7jrkPoB9777IuSDQC', '09171234567', 'admin', 1, 'Active');
+
 -- Work submission tables (employee QC workflow)
 CREATE TABLE IF NOT EXISTS `work_submissions` (
   `submission_id` bigint(20) NOT NULL AUTO_INCREMENT,
