@@ -12,6 +12,7 @@
     <li><a href="/dashboards/admin/production_board.php" class="nav-link"><i class="fas fa-columns"></i><span>Production Board</span></a></li>
     <li><a href="/dashboards/admin/sample_approvals.php" class="nav-link"><i class="fas fa-flask"></i><span>Sample Approvals</span></a></li>
     <li><a href="/dashboards/admin/production_analytics.php" class="nav-link"><i class="fas fa-chart-bar"></i><span>Analytics</span></a></li>
+    <li><a href="/dashboards/admin/production_schedule.php" class="nav-link"><i class="fas fa-calendar-alt"></i><span>Schedule</span></a></li>
     <li><a href="/dashboards/admin/quality_control.php" class="nav-link"><i class="fas fa-search"></i><span>Quality Control</span></a></li>
     <li><a href="/dashboards/admin/aql_qc.php" class="nav-link"><i class="fas fa-chart-pie"></i><span>AQL Sampling QC</span></a></li>
     <li><a href="/dashboards/admin/workload.php" class="nav-link"><i class="fas fa-tasks"></i><span>Workload</span></a></li>
