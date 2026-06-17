@@ -108,6 +108,20 @@ try {
                 $updateStageStmt = $pdo->prepare($updateStageSql);
                 $updateStageStmt->execute([$newStatus, $workNotes, $task_id, $user_id]);
 
+                // Notify customer
+                try {
+                    $ownerStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
+                    $ownerStmt->execute([$task_id]);
+                    $owner = $ownerStmt->fetch();
+                    if ($owner) {
+                        require_once __DIR__ . '/../../controller/NotificationController.php';
+                        $notif = new NotificationController($pdo);
+                        $notif->create($owner['user_id'], "Your order #ORD-{$task_id} stage updated to: {$newStatus}.");
+                    }
+                } catch (Exception $e) {
+                    error_log('Notif failed: ' . $e->getMessage());
+                }
+
                 // Commit transaction
                 $pdo->commit();
 

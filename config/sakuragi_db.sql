@@ -1309,6 +1309,25 @@ ALTER TABLE `payments`
   ADD COLUMN `reference_number` varchar(100) DEFAULT NULL AFTER `status`,
   ADD COLUMN `proof_file_path` text DEFAULT NULL AFTER `reference_number`;
 
+-- Shop settings table
+CREATE TABLE IF NOT EXISTS `shop_settings` (
+  `setting_id` int(11) NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(100) NOT NULL UNIQUE,
+  `setting_value` text DEFAULT NULL,
+  PRIMARY KEY (`setting_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO `shop_settings` (setting_key, setting_value) VALUES
+('shop_name', 'Sakuragi Tailoring Shop'),
+('shop_email', 'contact@sakuragi.ph'),
+('contact_number', '0917 123 4567'),
+('address', '123 JP Laurel Ave, Davao City'),
+('open_time', '09:00'),
+('close_time', '18:00'),
+('notifications_enabled', '1'),
+('facebook_link', 'https://facebook.com/sakuragi.shop'),
+('instagram_link', 'https://instagram.com/sakuragi.shop');
+
 -- Work submission tables (employee QC workflow)
 CREATE TABLE IF NOT EXISTS `work_submissions` (
   `submission_id` bigint(20) NOT NULL AUTO_INCREMENT,

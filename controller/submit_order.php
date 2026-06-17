@@ -135,6 +135,15 @@ try {
         $loyalty_stmt->execute([$user_id, $free_shirts, $free_shirts]);
     }
 
+    // 10. Send notification to customer
+    try {
+        require_once __DIR__ . '/NotificationController.php';
+        $notif = new NotificationController($pdo);
+        $notif->create($user_id, "Your order #ORD-{$order_id} has been placed successfully and is now pending.");
+    } catch (Exception $e) {
+        error_log('Notification failed: ' . $e->getMessage());
+    }
+
     $pdo->commit();
 
     echo json_encode([

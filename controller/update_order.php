@@ -19,10 +19,20 @@ if (!$order_id || !$action) {
 }
 
 try {
+    // Get user_id for notifications
+    $orderStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
+    $orderStmt->execute([$order_id]);
+    $orderData = $orderStmt->fetch();
+
     if ($action === 'cancel') {
         $stmt = $pdo->prepare("UPDATE orders SET status = 'Cancelled' WHERE order_id = ?");
         $stmt->execute([$order_id]);
-        echo json_encode(['success' => true]);
+        if ($orderData) {
+            require_once __DIR__ . '/NotificationController.php';
+            $notif = new NotificationController($pdo);
+            $notif->create($orderData['user_id'], "Your order #ORD-{$order_id} has been cancelled.");
+        }
+        echo json_encode(['success' => true, 'message' => 'Order cancelled']);
     } elseif ($action === 'update_status') {
         $status = $_POST['status'] ?? '';
         $allowed = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
@@ -31,7 +41,12 @@ try {
         }
         $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE order_id = ?");
         $stmt->execute([$status, $order_id]);
-        echo json_encode(['success' => true]);
+        if ($orderData) {
+            require_once __DIR__ . '/NotificationController.php';
+            $notif = new NotificationController($pdo);
+            $notif->create($orderData['user_id'], "Your order #ORD-{$order_id} status updated to: {$status}.");
+        }
+        echo json_encode(['success' => true, 'message' => 'Status updated']);
     } else {
         echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }
