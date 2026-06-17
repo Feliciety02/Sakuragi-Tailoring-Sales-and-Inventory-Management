@@ -157,6 +157,19 @@ function renderCard(o) {
   const priority = o.priority || 'medium';
   const thumb = o.design_preview ? '<img src="/public/' + o.design_preview + '" class="design-thumb">' : '';
 
+  // Batch quantity progress: get quantity at this card's stage vs total
+  const stageQty = o.stage_quantities || {};
+  const sq = stageQty[o.stage] || 0;
+  const totalQty = o.total_quantity || 0;
+  const qtyPct = totalQty > 0 ? Math.round((sq / totalQty) * 100) : 0;
+  const qtyBar = totalQty > 0 ? `<div style="margin-top:6px">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#6b7280;margin-bottom:2px">
+      <span>Batch: ${sq}/${totalQty}</span>
+      <span>${qtyPct}%</span>
+    </div>
+    <div class="progress-bar" style="height:4px;background:#e5e7eb"><div class="progress-fill" style="width:${qtyPct}%;background:#059669"></div></div>
+  </div>` : '';
+
   return `<div class="kanban-card" draggable="true" ondragstart="drag(event, ${o.order_id})" data-id="${o.order_id}">
     <div class="card-actions">
       <button onclick="openAssign(${o.order_id})" title="Assign"><i class="fas fa-user-plus"></i></button>
@@ -167,12 +180,13 @@ function renderCard(o) {
     <div class="meta-row">
       <span class="priority-badge priority-${priority}">${priority}</span>
       <span><i class="far fa-calendar-alt"></i> ${o.expected_completion ? o.expected_completion.slice(0,10) : '—'}</span>
-      <span>Qty: ${o.total_quantity || 0}</span>
+      <span>Qty: ${totalQty}</span>
     </div>
     <div class="meta-row">
       <span class="assignee"><span class="avatar-sm">${initials}</span> ${escapeHtml(empName)}</span>
     </div>
     <div class="progress-bar"><div class="progress-fill" style="width:${o.progress || 0}%"></div></div>
+    ${qtyBar}
     ${thumb}
   </div>`;
 }

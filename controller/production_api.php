@@ -410,10 +410,27 @@ try {
                 $fileStmt->execute([$ord['order_id']]);
                 $ord['design_preview'] = $fileStmt->fetchColumn();
 
-                // Item count
+                // Total item count
                 $detStmt = $pdo->prepare("SELECT SUM(quantity) FROM order_details WHERE order_id = ?");
                 $detStmt->execute([$ord['order_id']]);
                 $ord['total_quantity'] = (int) $detStmt->fetchColumn();
+
+                // Batch progress: estimate items completed through this stage
+                $ord['stage_quantities'] = [];
+                try {
+                    $scStmt = $pdo->prepare("
+                        SELECT COALESCE(SUM(od.quantity), 0) as qty
+                        FROM order_details od
+                        WHERE od.order_id = ?
+                    ");
+                    $scStmt->execute([$ord['order_id']]);
+                    $totalDet = (int)$scStmt->fetchColumn();
+                    // Estimate items at this stage as total * stage_progress / 100 (approximate)
+                    $estQty = round($totalDet * ($ord['progress'] / 100));
+                    $ord['stage_quantities'][$ord['stage']] = $estQty;
+                } catch (Exception $e) {
+                    // Silently fail if garment_tracking doesn't exist
+                }
             }
 
             echo json_encode(['orders' => $orders]);
