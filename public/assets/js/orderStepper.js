@@ -175,12 +175,25 @@ function validateStep4() {
 
 // -------- STEP 5: PAYMENT --------
 function setupStep5() {
-    const paymentFile = document.getElementById('paymentProof')?.files[0];
-    setNextButtonState(!!paymentFile);
+    const paymentInput = document.getElementById('paymentProof');
+    const hasFile = paymentInput && paymentInput.files && paymentInput.files.length > 0;
+    const hasReference = document.getElementById('referenceNumber') && document.getElementById('referenceNumber').value.trim().length > 0;
+    setNextButtonState(!!(hasFile && hasReference));
 }
 function validateStep5() {
-    const paymentFile = document.getElementById('paymentProof')?.files[0];
-    return !!paymentFile;
+    const paymentInput = document.getElementById('paymentProof');
+    const hasFile = paymentInput && paymentInput.files && paymentInput.files.length > 0;
+    const refNum = document.getElementById('referenceNumber');
+    const hasReference = refNum && refNum.value.trim().length > 0;
+    if (!hasFile) {
+        alert('Please upload a payment proof screenshot.');
+        return false;
+    }
+    if (!hasReference) {
+        alert('Please enter the payment reference number.');
+        return false;
+    }
+    return true;
 }
 
 document.addEventListener('DOMContentLoaded', updateStepper);

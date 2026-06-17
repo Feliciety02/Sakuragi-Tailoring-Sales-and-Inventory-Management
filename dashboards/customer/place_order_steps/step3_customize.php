@@ -126,7 +126,6 @@ if ($serviceId) {
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 function setNextButtonState(enabled) {
   const btn = document.getElementById('nextBtn');
@@ -396,9 +395,8 @@ document.getElementById('nextBtn')?.addEventListener('click', function () {
     sessionStorage.setItem('uploadedDesignName', file.name);
   }
 
-  document.querySelectorAll('.step-section').forEach(s => s.classList.remove('active'));
-  document.getElementById('step4').classList.add('active');
-    showStep4AndDisplaySummary(); // ✅ This triggers Step 4 display and renders the table
-
+  currentStep = 4;
+  updateStepper();
+  if (typeof displayOrderSummary === 'function') displayOrderSummary();
 });
 </script>

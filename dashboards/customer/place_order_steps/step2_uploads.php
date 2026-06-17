@@ -106,15 +106,6 @@ function simulateUploadProgress() {
     text.textContent = `${progress}%`;
   }, 150);
 
-  setTimeout(() => {
-  container.classList.add('d-none');
-  displayUploadedFile();
-  sessionStorage.setItem('uploadedDesign', 'true');
-
-  // Instead of enableNextButton(), use the proper setup trigger
-  if (typeof setupStep2 === 'function') setupStep2();
-}, 400);
-
 }
 
 function displayUploadedFile() {
