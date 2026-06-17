@@ -1328,9 +1328,15 @@ INSERT IGNORE INTO `shop_settings` (setting_key, setting_value) VALUES
 ('facebook_link', 'https://facebook.com/sakuragi.shop'),
 ('instagram_link', 'https://instagram.com/sakuragi.shop');
 
--- Seed admin user (password: admin123)
+-- Seed demo users (passwords: admin123 / demo123)
 INSERT IGNORE INTO `users` (`full_name`, `email`, `password`, `phone_number`, `role`, `branch_id`, `status`) VALUES
-('Admin', 'admin@sakuragi.ph', '$2y$10$bD9hFDc/fWS4EgwncDrPXeTJfI1z1N5PzLCo7jrkPoB9777IuSDQC', '09171234567', 'admin', 1, 'Active');
+('Admin', 'admin@sakuragi.ph', '$2y$10$bD9hFDc/fWS4EgwncDrPXeTJfI1z1N5PzLCo7jrkPoB9777IuSDQC', '09171234567', 'admin', 1, 'Active'),
+('Juan Dela Cruz', 'customer@demo.ph', '$2y$10$FuD4.ntLmkYStvdF5tKOgeFb51hzNP4gjpmSjujnD0TTJKWKMxGfq', '09159876543', 'customer', 1, 'Active'),
+('Maria Santos', 'employee@demo.ph', '$2y$10$FuD4.ntLmkYStvdF5tKOgeFb51hzNP4gjpmSjujnD0TTJKWKMxGfq', '09159876544', 'employee', 1, 'Active');
+
+-- Link demo employee to employees table for position lookup
+INSERT IGNORE INTO `employees` (`user_id`, `branch_id`, `hire_date`, `salary`, `position_id`, `shift_id`, `status_id`)
+SELECT `user_id`, 1, CURDATE(), 0.00, 1, 1, 1 FROM `users` WHERE `email` = 'employee@demo.ph';
 
 -- Work submission tables (employee QC workflow)
 CREATE TABLE IF NOT EXISTS `work_submissions` (

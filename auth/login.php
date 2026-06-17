@@ -98,9 +98,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <button type="submit">Sign In</button>
             </form>
+
+            <div class="demo-accounts">
+                <p class="demo-title">Demo Accounts</p>
+                <div class="demo-buttons">
+                    <button type="button" class="demo-btn admin" onclick="fillDemo('admin@sakuragi.ph','admin123')">
+                        <i class="fas fa-user-shield"></i> Admin
+                    </button>
+                    <button type="button" class="demo-btn employee" onclick="fillDemo('employee@demo.ph','demo123')">
+                        <i class="fas fa-user-tie"></i> Employee
+                    </button>
+                    <button type="button" class="demo-btn customer" onclick="fillDemo('customer@demo.ph','demo123')">
+                        <i class="fas fa-user"></i> Customer
+                    </button>
+                </div>
+            </div>
+
             <a href="register.php">Don't have an account? Sign Up here.</a>
         </div>
         <div class="illustration"></div>
     </div>
+<script>
+const demos = {
+    admin: ['admin@sakuragi.ph', 'admin123'],
+    employee: ['employee@demo.ph', 'demo123'],
+    customer: ['customer@demo.ph', 'demo123']
+};
+function fillDemo(email, password) {
+    document.getElementById('email').value = email;
+    document.getElementById('password').value = password;
+    document.querySelector('.login-form form').submit();
+}
+const params = new URLSearchParams(window.location.search);
+const demo = params.get('demo');
+if (demo && demos[demo]) {
+    fillDemo(demos[demo][0], demos[demo][1]);
+}
+</script>
+
+<style>
+.demo-accounts {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+}
+.demo-title {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 10px;
+    text-align: center;
+}
+.demo-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.demo-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.demo-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.demo-btn.admin { color: #dc3545; border-color: #dc3545; }
+.demo-btn.admin:hover { background: #dc3545; color: #fff; }
+.demo-btn.employee { color: #fd7e14; border-color: #fd7e14; }
+.demo-btn.employee:hover { background: #fd7e14; color: #fff; }
+.demo-btn.customer { color: #0d6efd; border-color: #0d6efd; }
+.demo-btn.customer:hover { background: #0d6efd; color: #fff; }
+</style>
 </body>
 </html>

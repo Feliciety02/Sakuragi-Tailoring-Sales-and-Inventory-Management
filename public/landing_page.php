@@ -120,6 +120,14 @@
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
                     <li class="nav-item"><a class="btn btn-outline-primary btn-sm px-4 ms-2" href="/auth/login.php">Login</a></li>
                     <li class="nav-item"><a class="btn btn-primary btn-sm px-4" href="/auth/register.php">Register</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="btn btn-sm px-4 text-white" href="#" style="background:#6c757d;" data-bs-toggle="dropdown">Demo</a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/auth/login.php?demo=admin"><i class="fas fa-user-shield me-2 text-danger"></i>Admin</a></li>
+                            <li><a class="dropdown-item" href="/auth/login.php?demo=employee"><i class="fas fa-user-tie me-2 text-warning"></i>Employee</a></li>
+                            <li><a class="dropdown-item" href="/auth/login.php?demo=customer"><i class="fas fa-user me-2 text-primary"></i>Customer</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </div>
