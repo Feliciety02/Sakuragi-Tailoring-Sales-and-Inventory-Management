@@ -17,6 +17,7 @@
     <li><a href="/dashboards/admin/workload.php" class="nav-link"><i class="fas fa-tasks"></i><span>Workload</span></a></li>
     <li><a href="/dashboards/admin/orders.php" class="nav-link"><i class="fas fa-receipt"></i><span>Manage Orders</span></a></li>
     <li><a href="/dashboards/admin/inventory.php" class="nav-link"><i class="fas fa-boxes"></i><span>Inventory</span></a></li>
+    <li><a href="/dashboards/admin/order_materials.php" class="nav-link"><i class="fas fa-roll"></i><span>Order Materials</span></a></li>
     <li><a href="/dashboards/admin/employees.php" class="nav-link"><i class="fas fa-users"></i><span>Employees</span></a></li>
     <li><a href="/dashboards/admin/reports.php" class="nav-link"><i class="fas fa-chart-line"></i><span>Reports</span></a></li>
     <li><a href="/dashboards/admin/settings.php" class="nav-link"><i class="fas fa-cog"></i><span>Settings</span></a></li>
