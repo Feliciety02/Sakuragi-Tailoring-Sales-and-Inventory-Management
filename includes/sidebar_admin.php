@@ -13,6 +13,7 @@
     <li><a href="/dashboards/admin/sample_approvals.php" class="nav-link"><i class="fas fa-flask"></i><span>Sample Approvals</span></a></li>
     <li><a href="/dashboards/admin/production_analytics.php" class="nav-link"><i class="fas fa-chart-bar"></i><span>Analytics</span></a></li>
     <li><a href="/dashboards/admin/quality_control.php" class="nav-link"><i class="fas fa-search"></i><span>Quality Control</span></a></li>
+    <li><a href="/dashboards/admin/aql_qc.php" class="nav-link"><i class="fas fa-chart-pie"></i><span>AQL Sampling QC</span></a></li>
     <li><a href="/dashboards/admin/workload.php" class="nav-link"><i class="fas fa-tasks"></i><span>Workload</span></a></li>
     <li><a href="/dashboards/admin/orders.php" class="nav-link"><i class="fas fa-receipt"></i><span>Manage Orders</span></a></li>
     <li><a href="/dashboards/admin/inventory.php" class="nav-link"><i class="fas fa-boxes"></i><span>Inventory</span></a></li>

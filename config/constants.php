@@ -126,3 +126,88 @@ function getStageProgress($stage)
     ];
     return $map[$stage] ?? 0;
 }
+
+// AQL Sampling Levels
+define('AQL_LEVEL_1', '1.0');
+define('AQL_LEVEL_2', '2.5');
+define('AQL_LEVEL_3', '4.0');
+define('AQL_INSPECTION_NORMAL', 'I');
+define('AQL_INSPECTION_TIGHTENED', 'II');
+define('AQL_INSPECTION_REDUCED', 'III');
+
+function getAQLSampleSize($lot_size, $inspection_level = 'II') {
+    $code_table = [
+        [2, 8, 'A', 'A', 'A'],
+        [9, 15, 'A', 'A', 'B'],
+        [16, 25, 'B', 'C', 'D'],
+        [26, 50, 'C', 'D', 'E'],
+        [51, 90, 'C', 'E', 'F'],
+        [91, 150, 'D', 'F', 'G'],
+        [151, 280, 'E', 'G', 'H'],
+        [281, 500, 'F', 'H', 'J'],
+        [501, 1200, 'G', 'J', 'K'],
+        [1201, 3200, 'H', 'K', 'L'],
+        [3201, 10000, 'J', 'L', 'M'],
+        [10001, 35000, 'K', 'M', 'N'],
+        [35001, 150000, 'L', 'N', 'P'],
+    ];
+    $level_map = ['I' => 2, 'II' => 3, 'III' => 4];
+    $col = $level_map[$inspection_level] ?? 3;
+    $code = 'A';
+    foreach ($code_table as $row) {
+        if ($lot_size >= $row[0] && $lot_size <= $row[1]) {
+            $code = $row[$col - 1];
+            break;
+        }
+    }
+    // Master sample size table: code => sample size
+    $sample_sizes = [
+        'A' => 2, 'B' => 3, 'C' => 5, 'D' => 8,
+        'E' => 13, 'F' => 20, 'G' => 32, 'H' => 50,
+        'J' => 80, 'K' => 125, 'L' => 200, 'M' => 315,
+        'N' => 500, 'P' => 800,
+    ];
+    return $sample_sizes[$code] ?? min($lot_size, 500);
+}
+
+function getAQLAcceptReject($aql_level, $sample_size) {
+    // AQL 1.0: Accept/Reject (Ac, Re) for Major defects
+    // AQL 2.5: Accept/Reject
+    // AQL 4.0: Accept/Reject
+    $table = [
+        '1.0' => [
+            2 => [0, 1], 3 => [0, 1], 5 => [0, 1], 8 => [0, 1],
+            13 => [0, 1], 20 => [0, 1], 32 => [1, 2], 50 => [1, 2],
+            80 => [2, 3], 125 => [3, 4], 200 => [5, 6], 315 => [7, 8],
+            500 => [10, 11], 800 => [14, 15],
+        ],
+        '2.5' => [
+            2 => [0, 1], 3 => [0, 1], 5 => [0, 1], 8 => [1, 2],
+            13 => [1, 2], 20 => [2, 3], 32 => [3, 4], 50 => [5, 6],
+            80 => [7, 8], 125 => [10, 11], 200 => [14, 15], 315 => [21, 22],
+            500 => [21, 22], 800 => [21, 22],
+        ],
+        '4.0' => [
+            2 => [0, 1], 3 => [0, 1], 5 => [1, 2], 8 => [1, 2],
+            13 => [2, 3], 20 => [3, 4], 32 => [5, 6], 50 => [7, 8],
+            80 => [10, 11], 125 => [14, 15], 200 => [21, 22], 315 => [21, 22],
+            500 => [21, 22], 800 => [21, 22],
+        ],
+    ];
+    $closest = 2;
+    foreach (array_keys($table[$aql_level] ?? $table['2.5']) as $s) {
+        if ($s >= $sample_size) { $closest = $s; break; }
+        $closest = $s;
+    }
+    return $table[$aql_level][$closest] ?? [0, 1];
+}
+
+function getAQLVerdict($critical, $major, $minor, $aql_level, $sample_size) {
+    if ($critical > 0) return 'Failed';
+    list($major_ac, $major_re) = getAQLAcceptReject($aql_level, $sample_size);
+    // Use AQL 4.0 for minor defects (one level looser)
+    list($minor_ac, $minor_re) = getAQLAcceptReject('4.0', $sample_size);
+    if ($major >= $major_re) return 'Failed';
+    if ($minor >= $minor_re) return 'Failed';
+    return 'Passed';
+}
