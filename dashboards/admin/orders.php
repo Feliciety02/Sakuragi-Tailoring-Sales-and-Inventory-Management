@@ -2,10 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/role_admin_only.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
-
+require_once '../../app/Middleware/role_admin_only.php';
+$pageTitle = 'Manage Orders';
 $stmt = $pdo->query("
     SELECT o.order_id, u.full_name, o.order_date, o.total_price, o.status, o.payment_status,
            s.service_name
@@ -16,10 +14,24 @@ $stmt = $pdo->query("
 ");
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Orders — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/tables.css" />
+</head>
+<body>
+<div class="dash-layout">
+  <?php render_role_sidebar($pdo); ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
     <h1>Manage Orders</h1>
 
     <div class="table-controls">
@@ -84,7 +96,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </tbody>
         </table>
     </div>
-</main>
+</div>
 
 <script src="/public/assets/js/tables.js"></script>
 <script>
@@ -93,7 +105,7 @@ function viewOrder(id) {
 }
 function deleteOrder(id) {
     if (confirm('Cancel order #' + id + '?')) {
-        fetch('/controller/update_order.php', {
+        fetch('/app/Controllers/update_order.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'order_id=' + id + '&action=cancel'
@@ -102,4 +114,14 @@ function deleteOrder(id) {
 }
 </script>
 
-<?php require_once '../../includes/footer.php'; ?>
+</div>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

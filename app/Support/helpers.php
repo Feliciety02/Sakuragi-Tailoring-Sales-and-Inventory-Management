@@ -162,7 +162,8 @@ function get_user_position_context(PDO $pdo, ?int $userId = null): array {
 
     $dashboard = match ($normalizedRole) {
         ROLE_QUALITY_CONTROL_INSPECTOR => '/dashboards/employee/employeePosition/qcInspector/dashboard.php',
-        ROLE_INVENTORY_MANAGER => '/dashboards/employee/inventory.php',
+        ROLE_INVENTORY_MANAGER => '/dashboards/admin/inventory.php',
+        ROLE_OPERATIONS_MANAGER => '/dashboards/admin/production_board.php',
         default => '/dashboards/employee/dashboard.php',
     };
 
@@ -184,11 +185,11 @@ function get_role_dashboard_home(PDO $pdo, ?string $role = null, ?int $userId = 
         case ROLE_CUSTOMER:
             return '/dashboards/customer/dashboard.php';
         case ROLE_OPERATIONS_MANAGER:
-            return '/dashboards/employee/dashboard.php';
+            return '/dashboards/admin/production_board.php';
         case ROLE_PRODUCTION_STAFF:
             return '/dashboards/employee/dashboard.php';
         case ROLE_INVENTORY_MANAGER:
-            return '/dashboards/employee/inventory.php';
+            return '/dashboards/admin/inventory.php';
         case ROLE_QUALITY_CONTROL_INSPECTOR:
             return '/dashboards/employee/employeePosition/qcInspector/dashboard.php';
         case ROLE_MANAGER:

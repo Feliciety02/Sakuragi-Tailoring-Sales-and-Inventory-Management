@@ -8,11 +8,13 @@
   </div>
   <nav class="sidebar-nav">
     <div class="section-label">Operations</div>
-    <a href="/dashboards/employee/dashboard.php" class="sidebar-item"><i class="fas fa-th-large"></i> Dashboard</a>
-    <a href="/dashboards/employee/assigned_orders.php" class="sidebar-item"><i class="fas fa-clipboard-list"></i> Orders Queue</a>
-    <a href="/dashboards/employee/kanban.php" class="sidebar-item"><i class="fas fa-columns"></i> Production Board</a>
-    <a href="/dashboards/employee/my_tasks.php" class="sidebar-item"><i class="fas fa-tasks"></i> Workload</a>
-    <a href="/dashboards/employee/garment_tracking.php" class="sidebar-item"><i class="fas fa-shirt"></i> Order Tracking</a>
+    <a href="/dashboards/admin/production_board.php" class="sidebar-item"><i class="fas fa-columns"></i> Production Board</a>
+    <a href="/dashboards/admin/orders.php" class="sidebar-item"><i class="fas fa-shopping-bag"></i> Orders Queue</a>
+    <a href="/dashboards/admin/sample_approvals.php" class="sidebar-item"><i class="fas fa-flask"></i> Sample Approvals</a>
+    <a href="/dashboards/admin/production_schedule.php" class="sidebar-item"><i class="fas fa-calendar-alt"></i> Scheduling</a>
+    <a href="/dashboards/admin/workload.php" class="sidebar-item"><i class="fas fa-tasks"></i> Workload</a>
+    <a href="/dashboards/admin/production_analytics.php" class="sidebar-item"><i class="fas fa-chart-line"></i> Team Performance</a>
+    <a href="/dashboards/admin/reports.php" class="sidebar-item"><i class="fas fa-chart-bar"></i> Reports</a>
     <div class="section-label">General</div>
     <a href="/dashboards/employee/profile.php" class="sidebar-item"><i class="fas fa-user"></i> Profile</a>
     <div class="sidebar-footer">

@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/role_admin_only.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
+require_once '../../app/Middleware/role_admin_only.php';
+
 
 $employees = $pdo->query("
     SELECT u.user_id, u.full_name, u.email,
@@ -50,14 +49,29 @@ $recentDone = $pdo->query("
     WHERE o.status = 'Completed'
     ORDER BY o.completion_date DESC LIMIT 10
 ");
+$pageTitle = 'Workload Dashboard';
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workload Dashboard — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css" />
 <style>
   body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
 </style>
-
-<div class="main-content">
+</head>
+<body>
+<div class="dash-layout">
+  <?php render_role_sidebar($pdo); ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <div class="mb-4">
     <h1 style="font-size:20px;font-weight:700;margin:0">Workload Dashboard</h1>
     <p style="font-size:13px;color:#6b7280;margin-top:4px">Employee capacity and task distribution</p>
@@ -156,4 +170,13 @@ $recentDone = $pdo->query("
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

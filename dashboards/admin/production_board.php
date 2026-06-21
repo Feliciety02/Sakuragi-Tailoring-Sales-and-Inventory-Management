@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/role_admin_only.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
+require_once '../../app/Middleware/role_admin_only.php';
+
 
 $user_id = $_SESSION['user_id'];
 
@@ -22,12 +21,21 @@ $stats['completed_today'] = $pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(
 
 // Most loaded employee
 $loaded = $pdo->query("SELECT u.full_name, COUNT(*) as cnt FROM order_workflow ow JOIN users u ON ow.assigned_employee = u.user_id JOIN orders o ON ow.order_id = o.order_id WHERE o.status NOT IN ('Completed','Cancelled','Refunded') GROUP BY ow.assigned_employee ORDER BY cnt DESC LIMIT 1")->fetch();
+$pageTitle = 'Production Board';
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Board — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css" />
 <style>
   body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
-  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
   .board-header { margin-bottom: 20px; }
   .board-header h1 { font-size: 20px; font-weight: 700; color: #1f2937; margin: 0; }
   .board-header p { font-size: 13px; color: #6b7280; margin-top: 4px; }
@@ -39,8 +47,13 @@ $loaded = $pdo->query("SELECT u.full_name, COUNT(*) as cnt FROM order_workflow o
   .card-actions button:hover { background: #e5e7eb; color: #1f2937; }
   .kanban-card .design-thumb { width: 100%; height: 60px; object-fit: cover; border-radius: 4px; margin-top: 8px; background: #f9fafb; }
 </style>
-
-<div class="main-content">
+</head>
+<body>
+<div class="dash-layout">
+  <?php render_role_sidebar($pdo); ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <div class="board-header d-flex align-items-center justify-content-between">
     <div>
       <h1>Production Board</h1>
@@ -115,7 +128,7 @@ let employees = <?= json_encode(array_column($employees, 'full_name', 'user_id')
 let allOrders = [];
 
 function loadBoard() {
-  fetch('/controller/production_api.php?action=get_board')
+  fetch('/app/Controllers/production_api.php?action=get_board')
     .then(r => r.json())
     .then(data => {
       allOrders = data.orders || [];
@@ -201,7 +214,7 @@ function drop(e) {
   if (!column) return;
   const newStage = column.dataset.stage;
 
-  fetch('/controller/production_api.php', {
+  fetch('/app/Controllers/production_api.php', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: 'action=move_stage&order_id=' + orderId + '&stage=' + encodeURIComponent(newStage)
@@ -230,7 +243,7 @@ function closeAssign() {
 function saveAssign() {
   const orderId = document.getElementById('assignOrderId').value;
   const employeeId = document.getElementById('assignEmployeeId').value;
-  fetch('/controller/production_api.php', {
+  fetch('/app/Controllers/production_api.php', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: 'action=assign_employee&order_id=' + orderId + '&employee_id=' + employeeId
@@ -242,7 +255,7 @@ function saveAssign() {
 function setPriority(orderId) {
   const p = prompt('Set priority: low, medium, high, urgent');
   if (!p || !['low','medium','high','urgent'].includes(p)) return;
-  fetch('/controller/production_api.php', {
+  fetch('/app/Controllers/production_api.php', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: 'action=set_priority&order_id=' + orderId + '&priority=' + p
@@ -259,4 +272,13 @@ loadBoard();
 setInterval(loadBoard, 30000);
 </script>
 
-<?php require_once '../../includes/footer.php'; ?>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

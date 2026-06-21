@@ -1,8 +1,8 @@
 <?php
-session_start();
-require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
-require_once __DIR__ . '/../../includes/role_admin_only.php';
+require_once __DIR__ . '/../../app/Middleware/role_admin_only.php';
 
 $pageTitle = 'AQL Lot Inspection';
 
@@ -111,9 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inspection']))
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/../../includes/sidebar_admin.php'; ?>
-    <div class="main-content">
-        <?php include __DIR__ . '/../../includes/topnav.php'; ?>
+    <div class="dash-layout">
+        <?php render_role_sidebar($pdo); ?>
+        <div class="dash-main">
+            <?php include __DIR__ . '/../../app/Views/Shared/topnav.php'; ?>
+            <div class="dash-content">
         <div class="content-container">
             <?php if (isset($success)): ?>
                 <div class="alert alert-success alert-dismissible fade show"><?= htmlspecialchars($success) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
@@ -241,8 +243,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inspection']))
             <?php endif; ?>
 
         </div>
+            </div>
+        </div>
     </div>
 
+    <script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+    </script>
     <script>
         function updateVerdict() {
             const critical = parseInt(document.getElementById('criticalDefects').value) || 0;

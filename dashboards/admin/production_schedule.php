@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/role_admin_only.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
+require_once '../../app/Middleware/role_admin_only.php';
+
 
 // Fetch all active orders with timeline data
 $orders = $pdo->query("
@@ -49,11 +48,21 @@ foreach ($orders as $o) {
     if (!isset($grouped[$s])) $grouped[$s] = [];
     $grouped[$s][] = $o;
 }
+$pageTitle = 'Production Schedule';
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production Schedule — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css" />
 <style>
   body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
   .gantt-container { overflow-x: auto; border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; }
   .gantt-header { display: flex; border-bottom: 2px solid #e5e7eb; position: sticky; top: 0; background: #fff; z-index: 2; }
   .gantt-label-col { width: 220px; min-width: 220px; padding: 10px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; border-right: 1px solid #e5e7eb; }
@@ -76,8 +85,13 @@ foreach ($orders as $o) {
   .stage-section-header .gantt-label-col { font-weight: 700; font-size: 12px; color: #374151; text-transform: none; }
   .stage-badge { font-size: 9px; padding: 1px 6px; border-radius: 6px; }
 </style>
-
-<div class="main-content">
+</head>
+<body>
+<div class="dash-layout">
+  <?php render_role_sidebar($pdo); ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
       <h1 style="font-size:20px;font-weight:700;margin:0">Production Schedule</h1>
@@ -159,4 +173,13 @@ foreach ($orders as $o) {
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>
