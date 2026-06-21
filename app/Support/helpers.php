@@ -89,6 +89,40 @@ function normalize_user_role(string $role, ?string $positionName = null): string
     return ROLE_CUSTOMER;
 }
 
+function get_assignable_employee_positions(): array {
+    return [
+        'Operations Manager' => ROLE_OPERATIONS_MANAGER,
+        'Tailor / Production Staff' => ROLE_PRODUCTION_STAFF,
+        'Inventory Manager' => ROLE_INVENTORY_MANAGER,
+        'Quality Control Inspector' => ROLE_QUALITY_CONTROL_INSPECTOR,
+    ];
+}
+
+function get_assignable_position_names(): array {
+    return array_keys(get_assignable_employee_positions());
+}
+
+function get_role_from_position_name(string $positionName): string {
+    $positionRoleMap = get_assignable_employee_positions();
+    return $positionRoleMap[$positionName] ?? normalize_user_role(ROLE_EMPLOYEE, $positionName);
+}
+
+function get_role_from_position_id(PDO $pdo, int $positionId): ?string {
+    static $cache = [];
+    if (isset($cache[$positionId])) {
+        return $cache[$positionId];
+    }
+
+    $stmt = $pdo->prepare("SELECT position_name FROM positions WHERE position_id = ?");
+    $stmt->execute([$positionId]);
+    $positionName = $stmt->fetchColumn();
+    if (!$positionName) {
+        return $cache[$positionId] = null;
+    }
+
+    return $cache[$positionId] = get_role_from_position_name((string) $positionName);
+}
+
 function get_user_position_context(PDO $pdo, ?int $userId = null): array {
     $userId = $userId ?? (int) ($_SESSION['user_id'] ?? 0);
     if ($userId <= 0) {

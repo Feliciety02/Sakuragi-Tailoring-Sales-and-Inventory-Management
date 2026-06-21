@@ -9,19 +9,10 @@ redirect_if_logged_in();
 $demoAccounts = [
     ['Admin', 'admin@sakuragi.ph', 'admin123', '09171234567', 'admin', null],
     ['Juan Dela Cruz', 'customer@demo.ph', 'demo123', '09159876543', 'customer', null],
-    ['Maria Santos', 'employee@demo.ph', 'demo123', '09159876544', 'employee', 1],
-    ['Pedro Reyes', 'tailor@demo.ph', 'demo123', '09151234561', 'employee', 1],
-    ['Elena Gomez', 'senior@demo.ph', 'demo123', '09151234562', 'employee', 2],
-    ['Rosa Villanueva', 'alteration@demo.ph', 'demo123', '09151234563', 'employee', 3],
-    ['Mario Cruz', 'pattern@demo.ph', 'demo123', '09151234564', 'employee', 4],
-    ['Josefa Torres', 'sublimation@demo.ph', 'demo123', '09151234565', 'employee', 5],
-    ['Ramon Santos', 'screenprint@demo.ph', 'demo123', '09151234566', 'employee', 6],
-    ['Luzviminda Co', 'embroidery@demo.ph', 'demo123', '09151234567', 'employee', 8],
-    ['Antonio Garcia', 'qc@demo.ph', 'demo123', '09151234568', 'employee', 10],
-    ['Teresa Lim', 'packing@demo.ph', 'demo123', '09151234569', 'employee', 11],
-    ['Ricardo Reyes', 'production@demo.ph', 'demo123', '09151234570', 'employee', 12],
-    ['Sofia Martinez', 'shop@demo.ph', 'demo123', '09151234571', 'employee', 14],
-    ['Carlos Mercado', 'inventory@demo.ph', 'demo123', '09151234572', 'employee', 15],
+    ['Maria Santos', 'operations@demo.ph', 'demo123', '09159876544', ROLE_OPERATIONS_MANAGER, 19],
+    ['Pedro Reyes', 'tailor@demo.ph', 'demo123', '09151234561', ROLE_PRODUCTION_STAFF, 21],
+    ['Antonio Garcia', 'qc@demo.ph', 'demo123', '09151234568', ROLE_QUALITY_CONTROL_INSPECTOR, 10],
+    ['Carlos Mercado', 'inventory@demo.ph', 'demo123', '09151234572', ROLE_INVENTORY_MANAGER, 20],
 ];
 
 foreach ($demoAccounts as $demo) {
@@ -44,24 +35,16 @@ foreach ($demoAccounts as $demo) {
             $stmt = $pdo->prepare("INSERT INTO employees (user_id, branch_id, hire_date, salary, position_id, status_id) VALUES (?, 2, CURDATE(), 0, ?, 1)");
             $stmt->execute([$existingId, $demo[5]]);
         }
+        $pdo->prepare("UPDATE users SET role = ? WHERE user_id = ?")->execute([$demo[4], $existingId]);
     }
 }
 
 $demoPositions = [
-    ['admin', 'admin@sakuragi.ph', 'admin123', 'Production Manager', '#151515', 'fa-industry'],
-    ['manager', 'admin@sakuragi.ph', 'admin123', 'Operations Head', '#2b2b2b', 'fa-chart-line'],
-    ['tailor', 'tailor@demo.ph', 'demo123', 'Cutting Team', '#9c1111', 'fa-cut'],
-    ['senior', 'senior@demo.ph', 'demo123', 'Assembly Lead', '#7c1010', 'fa-shirt'],
-    ['alteration', 'alteration@demo.ph', 'demo123', 'Alterations', '#5e1b1b', 'fa-pencil-ruler'],
-    ['pattern', 'pattern@demo.ph', 'demo123', 'Pattern / Grading', '#4a0a0a', 'fa-drafting-compass'],
-    ['sublimation', 'sublimation@demo.ph', 'demo123', 'Sublimation', '#b32020', 'fa-print'],
-    ['screenprint', 'screenprint@demo.ph', 'demo123', 'Screen Printing', '#862121', 'fa-palette'],
-    ['embroidery', 'embroidery@demo.ph', 'demo123', 'Embroidery', '#3a3a3a', 'fa-scissors'],
-    ['qc', 'qc@demo.ph', 'demo123', 'QC (AQL Sampling)', '#1a1a1a', 'fa-clipboard-check'],
-    ['packing', 'packing@demo.ph', 'demo123', 'Packing / Labeling', '#5b5b5b', 'fa-box'],
-    ['production', 'production@demo.ph', 'demo123', 'Prod. Coordinator', '#a51414', 'fa-clipboard-list'],
-    ['shop', 'shop@demo.ph', 'demo123', 'Sales / Order Intake', '#cf2f2f', 'fa-store'],
-    ['inventory', 'inventory@demo.ph', 'demo123', 'Material Handler', '#6b0000', 'fa-roll'],
+    ['admin', 'admin@sakuragi.ph', 'admin123', 'Admin', '#151515', 'fa-industry'],
+    ['operations', 'operations@demo.ph', 'demo123', 'Operations Manager', '#2b2b2b', 'fa-chart-line'],
+    ['production', 'tailor@demo.ph', 'demo123', 'Tailor / Production Staff', '#9c1111', 'fa-cut'],
+    ['inventory', 'inventory@demo.ph', 'demo123', 'Inventory Manager', '#6b0000', 'fa-boxes-stacked'],
+    ['qc', 'qc@demo.ph', 'demo123', 'Quality Control Inspector', '#1a1a1a', 'fa-clipboard-check'],
     ['customer', 'customer@demo.ph', 'demo123', 'Customer', '#7b7b7b', 'fa-user'],
 ];
 

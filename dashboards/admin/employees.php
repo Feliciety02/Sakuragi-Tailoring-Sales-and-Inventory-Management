@@ -1,11 +1,11 @@
 <?php
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
-require_once '../../middleware/role_admin_only.php';
+require_once '../../app/Middleware/role_admin_only.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
-require_once __DIR__ . '/../../controller/EmployeesController.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
+
+require_once __DIR__ . '/../../app/Controllers/EmployeesController.php';
 
 
 // Fetch employee list
@@ -31,7 +31,11 @@ $stmt = $pdo->prepare("
 ");
 
 // Load dropdown data from DB
-$positions = $pdo->query("SELECT position_id, position_name FROM positions")->fetchAll(PDO::FETCH_ASSOC);
+$assignablePositionNames = get_assignable_position_names();
+$positionPlaceholders = implode(',', array_fill(0, count($assignablePositionNames), '?'));
+$positionsStmt = $pdo->prepare("SELECT position_id, position_name FROM positions WHERE position_name IN ($positionPlaceholders) ORDER BY position_name");
+$positionsStmt->execute($assignablePositionNames);
+$positions = $positionsStmt->fetchAll(PDO::FETCH_ASSOC);
 $shifts = $pdo->query("SELECT shift_id, shift_name FROM shifts")->fetchAll(PDO::FETCH_ASSOC);
 $statuses = $pdo->query("SELECT status_id, status_name FROM statuses")->fetchAll(PDO::FETCH_ASSOC);
 $departments = $pdo->query("SELECT department_id, department_name FROM departments")->fetchAll(PDO::FETCH_ASSOC);
@@ -43,13 +47,28 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
     $result = [];
     error_log('DB error: ' . $e->getMessage());
 }
+$pageTitle = 'Manage Employees';
 ?>
-
-<link rel="stylesheet" href="/public/assets/css/adminEmployee.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Employees — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/adminEmployee.css" />
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/admin.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <h1>Manage Employees</h1>
+  <p class="text-muted" style="margin:0 0 18px;">Assignable operational roles: Operations Manager, Tailor / Production Staff, Inventory Manager, and Quality Control Inspector.</p>
   
   <div class="table-controls">
 <div class="search-wrapper">
@@ -103,7 +122,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
       </tbody>
     </table>
   </div>
-</main>
+</div>
 
 
 <!-- Add Modal -->
@@ -112,7 +131,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
     <span class="close-btn" onclick="closeAddEmployeeModal()">×</span>
     <h2 class="modal-title">Add New Employee</h2>
     <p class="modal-subtext">Fill in the fields to create a new employee profile.</p>
-    <form method="POST" action="../../controller/EmployeesController.php">
+    <form method="POST" action="../../app/Controllers/EmployeesController.php">
       <input type="hidden" name="action" value="add">
       <label>Full Name</label>
       <input type="text" name="full_name" placeholder="e.g. Jane Doe" required>
@@ -170,7 +189,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
   <div class="modal-content">
     <span class="close-btn" onclick="closeEditEmployeeModal()">×</span>
     <h2 class="modal-title">Edit Employee</h2>
-    <form method="POST" action="../../controller/EmployeesController.php">
+    <form method="POST" action="../../app/Controllers/EmployeesController.php">
   <input type="hidden" name="action" value="edit">
   <input type="hidden" id="editEmployeeId" name="employee_id">
 
@@ -231,7 +250,7 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
   <div class="modal-content">
     <span class="close-btn" onclick="closeDeleteEmployeeModal()">×</span>
     <h2 class="modal-title">Confirm Deletion</h2>
-    <form method="POST" action="../../controller/EmployeesController.php">
+    <form method="POST" action="../../app/Controllers/EmployeesController.php">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" id="deleteEmployeeId" name="employee_id">
       <p>This will remove the employee and revert their account to customer. Proceed?</p>
@@ -243,7 +262,8 @@ $departments = $pdo->query("SELECT department_id, department_name FROM departmen
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+  </div>
+</div>
 
 <script>
 function showAddEmployeeModal() {
@@ -337,3 +357,11 @@ const table = document.querySelector("#employeeTable"); // ✅ Correct for emplo
 
 
 </script>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>
