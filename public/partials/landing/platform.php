@@ -2,16 +2,16 @@
   <div class="container">
     <div class="section-header">
       <span class="section-kicker">Customer confidence</span>
-      <h2>Customers see a modern shop front, while the team keeps the order organized behind it.</h2>
-      <p>The landing page now balances presentation and functionality, so the business looks professional without hiding the system value.</p>
+      <h2>A better customer experience backed by organized order handling.</h2>
+      <p>Sakuragi looks professional on the front end while the team keeps measurements, progress, and release details in order behind the scenes.</p>
     </div>
 
     <div class="feature-showcase">
       <article class="feature-panel feature-panel-large fade-up">
         <div class="panel-copy">
           <span class="panel-label">Order visibility</span>
-          <h3>Track requests without chasing updates manually</h3>
-          <p>Customer accounts, order summaries, and structured production notes make it easier to follow work from intake to release.</p>
+          <h3>Track requests without chasing updates</h3>
+          <p>Customer accounts, order summaries, and structured production notes make work easier to follow from intake to release.</p>
         </div>
         <div class="metric-stack">
           <div>
@@ -31,20 +31,20 @@
 
       <article class="feature-panel fade-up" style="animation-delay: .08s">
         <span class="panel-label">Professional presentation</span>
-        <h3>Better first impression</h3>
-        <p>The storefront image now leads the page, making the business feel real, established, and easier to trust.</p>
+        <h3>Clearer first impression</h3>
+        <p>Customers immediately see the shop, the services offered, and the kind of work Sakuragi delivers.</p>
       </article>
 
       <article class="feature-panel fade-up" style="animation-delay: .16s">
         <span class="panel-label">Better order experience</span>
         <h3>Less confusion for customers</h3>
-        <p>Customers can understand services, process, and access points faster without being dropped into dashboard-heavy messaging.</p>
+        <p>Services, process, and order access points are easier to understand without extra system-heavy messaging.</p>
       </article>
 
       <article class="feature-panel accent-panel fade-up" style="animation-delay: .24s">
-        <span class="panel-label">Modernized layout</span>
-        <h3>Modular sections for easier updates</h3>
-        <p>The landing page is split into reusable sections first, so future copy and design changes are simpler to maintain.</p>
+        <span class="panel-label">Reliable coordination</span>
+        <h3>Built for real customer orders</h3>
+        <p>Uniform batches, custom garments, and follow-up adjustments can all be handled with better structure.</p>
       </article>
     </div>
   </div>

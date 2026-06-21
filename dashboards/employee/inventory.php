@@ -1,21 +1,34 @@
 <?php
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_employee.php';
+require_once '../../app/Middleware/auth_required.php';
 require_once __DIR__ . '/../../config/db_connect.php'; // This defines $pdo
-require_once __DIR__ . '/../../controller/InventoryController.php';
+require_once __DIR__ . '/../../app/Controllers/InventoryController.php';
+
+$pageTitle = 'Inventory';
 
 $inventoryItems = getInventory($pdo);
 $suppliers = getSuppliers($pdo);
 $types = getSupplyTypes($pdo);
 ?>
-
-<link rel="stylesheet" href="/../public/assets/css/adminInventory.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/adminInventory.css" />
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <h1>Manage Inventory</h1>
 
   <div class="table-controls">
@@ -88,14 +101,16 @@ $types = getSupplyTypes($pdo);
     </table>
     <div id="paginationControls" class="pagination-controls"></div>
   </div>
-</main>
+</div>
+  </div>
+</div>
 
 <!-- Add Modal -->
 <div id="addInventoryModal" class="modal add">
   <div class="modal-content">
     <span class="close-btn" onclick="closeAddInventoryModal()">×</span>
     <h2 class="modal-title">Add Inventory Item</h2>
-    <form method="POST" action="../../controller/InventoryController.php">
+    <form method="POST" action="../../app/Controllers/InventoryController.php">
       <input type="hidden" name="action" value="add">
       <label>Item Name</label>
       <input type="text" name="item_name" required>
@@ -129,7 +144,7 @@ $types = getSupplyTypes($pdo);
     <span class="close-btn" onclick="closeEditInventoryModal()">×</span>
     <h2 class="modal-title">Edit Inventory Item</h2>
 
-    <form method="POST" action="../../controller/InventoryController.php" class="edit-form">
+    <form method="POST" action="../../app/Controllers/InventoryController.php" class="edit-form">
       <input type="hidden" name="action" value="edit">
       <input type="hidden" id="editInventoryId" name="inventory_id">
 
@@ -182,7 +197,7 @@ $types = getSupplyTypes($pdo);
   <div class="modal-content">
     <span class="close-btn" onclick="closeDeleteInventoryModal()">×</span>
     <h2 class="modal-title">Delete Inventory Item</h2>
-    <form method="POST" action="../../controller/InventoryController.php">
+    <form method="POST" action="../../app/Controllers/InventoryController.php">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" id="deleteInventoryId" name="inventory_id">
       <p>Are you sure you want to delete this item?</p>
@@ -194,7 +209,13 @@ $types = getSupplyTypes($pdo);
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>
 
 <script>
 const typeIdMap = <?= json_encode(array_column($types, 'supply_type_id', 'name')) ?>;

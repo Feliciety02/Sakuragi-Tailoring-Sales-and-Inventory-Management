@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/role_admin_only.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_admin.php';
+require_once '../../app/Middleware/role_admin_only.php';
+
 
 // Handle save
 $saveMessage = '';
@@ -38,8 +37,25 @@ try {
 } catch (PDOException $e) {
     error_log('Settings load error: ' . $e->getMessage());
 }
+$pageTitle = 'Shop Settings';
 ?>
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Settings — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/admin.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
     <div class="container-fluid mb-4">
         <div class="row">
             <div class="col-12">
@@ -111,6 +127,15 @@ try {
             <button type="submit" class="btn btn-primary">Save Settings</button>
         </form>
     </div>
-</main>
+</div>
 
-<?php require_once '../../includes/footer.php'; ?>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

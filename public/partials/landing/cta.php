@@ -3,17 +3,21 @@
     <div class="cta-card fade-up">
       <div>
         <span class="section-kicker light">Ready to start</span>
-        <h2>Visit Sakuragi or create an account to follow your order more easily.</h2>
-        <p>Use the updated landing page as the customer-facing entry point for inquiries, order placement, and status tracking.</p>
+        <h2>Start your order with Sakuragi and keep the details easy to follow.</h2>
+        <p>Create an account for requests and tracking, or sign in to check the latest status of your order.</p>
       </div>
       <div class="cta-actions">
+        <a href="/public/contact.php" class="btn btn-dark">
+          <i class="fas fa-phone"></i>
+          Contact Page
+        </a>
         <a href="/auth/register.php" class="btn btn-light">
           <i class="fas fa-user-plus"></i>
-          Create account
+          Create Account
         </a>
         <a href="/auth/login.php" class="btn btn-dark">
           <i class="fas fa-right-to-bracket"></i>
-          Track order
+          Track Order
         </a>
       </div>
     </div>

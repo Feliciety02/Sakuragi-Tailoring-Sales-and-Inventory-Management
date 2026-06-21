@@ -1,8 +1,8 @@
 <?php
-session_start();
-require_once __DIR__ . '/../../../../config/database.php';
+require_once __DIR__ . '/../../../../config/db_connect.php';
+require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
-require_once __DIR__ . '/../../../../includes/auth_check.php';
+require_once __DIR__ . '/../../../../app/Middleware/auth_check.php';
 
 $pageTitle = 'AQL Lot Inspection';
 
@@ -47,12 +47,13 @@ $failed_today = $stmt->fetchColumn();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $pageTitle ?> - QC Inspector</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><?= $pageTitle ?> — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css">
     <style>
         .aql-badge { font-size: 0.8rem; padding: 2px 8px; border-radius: 12px; }
         .aql-pass { background: #d1fae5; color: #065f46; }
@@ -64,9 +65,11 @@ $failed_today = $stmt->fetchColumn();
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/../../../../includes/sidebar_qc_inspector.php'; ?>
-    <div class="main-content">
-        <?php include __DIR__ . '/../../../../includes/topnav.php'; ?>
+<div class="dash-layout">
+    <?php require_once __DIR__ . '/../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+    <div class="dash-main">
+        <?php require_once __DIR__ . '/../../../../app/Views/Shared/topnav.php'; ?>
+        <div class="dash-content">
         <div class="content-container">
 
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -181,8 +184,15 @@ $failed_today = $stmt->fetchColumn();
             </div>
 
         </div>
+        </div>
     </div>
+</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+    document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
 </body>
 </html>

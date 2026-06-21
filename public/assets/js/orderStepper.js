@@ -99,7 +99,7 @@ function submitOrder() {
         formData.append('payment_proof', proofInput.files[0]);
     }
 
-    fetch('/controller/submit_order.php', {
+    fetch('/app/Controllers/submit_order.php', {
         method: 'POST',
         body: formData
     })

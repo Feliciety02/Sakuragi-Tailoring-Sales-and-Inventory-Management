@@ -1,0 +1,13 @@
+{
+    "name": "sakuragi/tailoring-system",
+    "description": "Sakuragi Tailoring Sales and Inventory Management System",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Sakuragi\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.0"
+    }
+}

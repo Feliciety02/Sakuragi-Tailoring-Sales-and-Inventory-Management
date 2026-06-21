@@ -1,71 +1,16 @@
-/* Enhanced sidebar responsiveness for Senior Tailor Dashboard */
-
-/* Base styles */
-.sidebar {
-  width: 250px;
-  transition: width 0.3s ease-in-out, margin-left 0.3s ease-in-out;
-  position: fixed;
-  height: 100%;
-  z-index: 1000;
-  top: 60px; /* Adjust based on your header height */
-  left: 0;
-}
-
-/* Sidebar in collapsed state */
-.sidebar.collapsed {
-  width: 70px;
-}
-
-.sidebar.collapsed span {
+/* Mobile overlay for sidebar-modern */
+.overlay {
   display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
 }
+.overlay.show { display: block; }
 
-.sidebar.collapsed .sidebar-header button {
-  transform: rotate(180deg);
-}
-
-/* Main content that should adjust with sidebar */
-.main-content {
-  margin-left: 250px;
-  transition: margin-left 0.3s ease-in-out;
-  padding: 20px;
-}
-
-/* Main content adjustment when sidebar is collapsed */
-.sidebar.collapsed ~ .main-content {
-  margin-left: 70px;
-}
-
-/* Media query for mobile devices */
 @media (max-width: 768px) {
-  .sidebar {
-    margin-left: -250px;
-  }
-  
-  .sidebar.show {
-    margin-left: 0;
-  }
-  
-  .main-content {
-    margin-left: 0;
-  }
-  
-  .sidebar.collapsed {
-    margin-left: -70px;
-  }
-  
-  .overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-  }
-  
-  .overlay.show {
-    display: block;
-  }
+  .sidebar-modern.open + .overlay.show { display: block; }
 }

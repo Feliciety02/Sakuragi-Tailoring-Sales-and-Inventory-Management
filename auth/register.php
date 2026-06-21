@@ -2,19 +2,19 @@
 require_once '../config/db_connect.php';
 require_once '../config/session_handler.php';
 require_once '../config/constants.php';
-require_once '../includes/functions.php';
+require_once '../app/Support/helpers.php';
 
 redirect_if_logged_in();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = sanitize_input($_POST['full_name']);
-    $email = sanitize_input($_POST['email']);
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-    $phone_number = sanitize_input($_POST['phone_number']);
+    $full_name = sanitize_input($_POST['full_name'] ?? '');
+    $email = sanitize_input($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $phone_number = sanitize_input($_POST['phone_number'] ?? '');
     $role = ROLE_CUSTOMER;
 
-    if (empty($full_name) || empty($email) || empty($password) || empty($confirm_password)) {
+    if ($full_name === '' || $email === '' || $password === '' || $confirm_password === '' || $phone_number === '') {
         set_flash('error', 'All fields are required.');
         header('Location: register.php');
         exit();
@@ -58,299 +58,171 @@ $success = get_flash('success');
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png">
-  <title>Sign Up — Sakuragi</title>
+  <title>Sign Up - Sakuragi</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f5f5f5; color: #111111;
-      min-height: 100vh; display: flex;
-      -webkit-font-smoothing: antialiased;
-    }
-    .split { display: flex; width: 100%; min-height: 100vh; }
-    .brand-side {
-      flex: 1; background: linear-gradient(145deg, #050505, #181818 58%, #2a0000 100%);
-      display: flex; flex-direction: column; justify-content: center;
-      padding: 80px; position: relative; overflow: hidden;
-    }
-    .brand-side::before {
-      content: ''; position: absolute; inset: 0;
-      background:
-        radial-gradient(circle at 18% 22%, rgba(246,0,0,.32) 0%, transparent 28%),
-        radial-gradient(circle at 82% 78%, rgba(246,0,0,.18) 0%, transparent 24%);
-    }
-    .brand-side .content { position: relative; z-index: 1; max-width: 440px; }
-    .brand-side .logo {
-      display: flex; align-items: center; gap: 14px; margin-bottom: 40px;
-    }
-    .brand-side .logo img {
-      width: 64px; height: 64px; object-fit: contain;
-      filter: drop-shadow(0 8px 20px rgba(0,0,0,.25));
-    }
-    .brand-side .logo span { font-size: 1.2rem; font-weight: 700; color: #fff; }
-    .brand-side h1 { font-size: 2.5rem; font-weight: 800; color: #fff; line-height: 1.2; letter-spacing: -.03em; margin-bottom: 16px; }
-    .brand-side p { font-size: 1rem; color: rgba(255,255,255,.65); line-height: 1.7; margin-bottom: 48px; }
-    .brand-side .testimonial {
-      background: rgba(255,255,255,.08); border-radius: 12px;
-      padding: 24px; border: 1px solid rgba(255,255,255,.06);
-    }
-    .brand-side .testimonial .quote {
-      font-size: .95rem; color: rgba(255,255,255,.8); line-height: 1.6;
-      font-style: italic; margin-bottom: 12px;
-    }
-    .brand-side .testimonial .author {
-      display: flex; align-items: center; gap: 10px;
-    }
-    .brand-side .testimonial .author .avatar {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: #f60000; display: flex; align-items: center;
-      justify-content: center; color: #fff; font-size: .8rem; font-weight: 700;
-    }
-    .brand-side .testimonial .author .info { font-size: .85rem; }
-    .brand-side .testimonial .author .name { font-weight: 600; color: #fff; }
-    .brand-side .testimonial .author .role { color: rgba(255,255,255,.5); font-size: .8rem; }
-    .form-side {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      padding: 40px;
-    }
-    .form-container {
-      width: 100%; max-width: 420px; max-height: 100vh;
-      overflow-y: auto; padding: 8px 0;
-    }
-    .form-container::-webkit-scrollbar { width: 4px; }
-    .form-container::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 2px; }
-    .form-container .back-link {
-      display: inline-flex; align-items: center; gap: 6px;
-      color: #737373; font-size: .85rem; font-weight: 500;
-      text-decoration: none; margin-bottom: 24px; transition: .2s;
-    }
-    .form-container .back-link:hover { color: #111111; }
-    .form-container h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 4px; }
-    .form-container .subtitle { font-size: .9rem; color: #525252; margin-bottom: 28px; }
-    .error-banner {
-      padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca;
-      border-radius: 10px; font-size: .85rem; color: #991b1b; margin-bottom: 20px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .success-banner {
-      padding: 12px 16px; background: #d1fae5; border: 1px solid #a7f3d0;
-      border-radius: 10px; font-size: .85rem; color: #065f46; margin-bottom: 20px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .form-group { margin-bottom: 18px; }
-    .form-group label {
-      display: block; font-size: .8rem; font-weight: 600;
-      color: #262626; margin-bottom: 6px;
-    }
-    .form-group .input-wrap {
-      position: relative;
-    }
-    .form-group .input-wrap i {
-      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-      color: #737373; font-size: .9rem;
-    }
-    .form-group input {
-      width: 100%; padding: 12px 14px 12px 42px;
-      border: 1.5px solid #d4d4d4; border-radius: 10px;
-      font-size: .9rem; font-family: inherit;
-      outline: none; transition: .2s; background: #fff;
-    }
-    .form-group input:focus {
-      border-color: #f60000; box-shadow: 0 0 0 3px rgba(246,0,0,.14);
-    }
-    .form-group input::placeholder { color: #a3a3a3; }
-    .btn-submit {
-      width: 100%; padding: 14px; border: none; border-radius: 10px;
-      background: linear-gradient(135deg, #050505, #f60000); color: #fff; font-size: .95rem; font-weight: 600;
-      font-family: inherit; cursor: pointer; transition: .2s; margin-top: 4px;
-    }
-    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(246,0,0,.28); }
-    .demo-section {
-      margin: 20px 0 0; padding: 16px;
-      background: #fafafa; border: 1px solid #e5e5e5;
-      border-radius: 12px;
-    }
-    .demo-section .demo-title {
-      font-size: .7rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .05em; color: #737373; margin-bottom: 10px;
-      text-align: center;
-    }
-    .demo-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-    .demo-grid form { flex: 1 0 calc(33.333% - 4px); min-width: 0; }
-    .demo-btn {
-      width: 100%; padding: 10px 4px; border: none;
-      border-radius: 6px; cursor: pointer;
-      font-size: .7rem; font-weight: 700; font-family: inherit;
-      transition: .15s; display: flex; align-items: center;
-      justify-content: center; gap: 4px; color: #fff;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .demo-btn:hover { transform: translateY(-1px); filter: brightness(1.15); box-shadow: 0 3px 8px rgba(0,0,0,.15); }
-    .demo-btn i { font-size: .65rem; flex-shrink: 0; }
-    .signin-link {
-      text-align: center; margin-top: 24px;
-      font-size: .85rem; color: #525252;
-    }
-    .signin-link a { color: #d10000; font-weight: 600; text-decoration: none; }
-    .signin-link a:hover { text-decoration: underline; }
-    @media (max-width: 1024px) {
-      .brand-side { display: none; }
-      .form-side { padding: 24px; }
-      .form-container { max-height: none; overflow: visible; }
-      .demo-grid form { flex: 1 0 calc(50% - 3px); }
-    }
-    @media (max-width: 480px) {
-      .demo-grid form { flex: 1 0 100%; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/public/css/login.css">
 </head>
 <body>
-  <div class="split">
+  <div class="auth-shell">
+    <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> Back to home</a>
 
-    <!-- Brand Side -->
-    <div class="brand-side">
-      <div class="content">
-        <div class="logo">
-          <img src="/public/assets/images/sakuragi-logo.png" alt="Sakuragi logo">
-          <span>Sakuragi</span>
-        </div>
-        <h1>Start managing your production</h1>
-        <p>Join hundreds of garment businesses using Sakuragi to streamline orders, production, and quality control.</p>
-        <div class="testimonial">
-          <div class="quote">"Sakuragi transformed how we manage our tailoring shop. From order intake to QC, everything is in one place."</div>
-          <div class="author">
-            <div class="avatar">MC</div>
-            <div class="info"><div class="name">Maria Cruz</div><div class="role">Owner, Cruz Tailoring</div></div>
+    <div class="auth-grid auth-grid-register">
+      <section class="brand-side brand-side-customer">
+        <div class="content">
+          <div class="logo">
+            <img src="/public/assets/images/sakuragi-logo.png" alt="Sakuragi logo">
+            <div class="logo-copy">
+              <span>Sakuragi</span>
+              <small>Tailoring Main Branch</small>
+            </div>
+          </div>
+
+          <span class="eyebrow">Customer signup</span>
+          <h1>Create an account to place orders and track updates more easily.</h1>
+          <p>Your account helps keep measurements, order notes, and status updates in one place whenever you request custom garments, uniforms, or alterations.</p>
+
+          <div class="feature-list">
+            <div class="feature-item"><span class="icon"><i class="fas fa-shirt"></i></span> Book custom tailoring, uniforms, and alterations with clearer order details.</div>
+            <div class="feature-item"><span class="icon"><i class="fas fa-ruler-combined"></i></span> Keep your measurements and notes attached to future requests.</div>
+            <div class="feature-item"><span class="icon"><i class="fas fa-receipt"></i></span> Check progress and pickup readiness without asking for manual updates every time.</div>
+          </div>
+
+          <div class="auth-note">
+            <strong>For customers</strong>
+            <p>This signup creates a customer account for placing orders and tracking them online.</p>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- Form Side -->
-    <div class="form-side">
-      <div class="form-container">
-        <a href="/public/landing_page.php" class="back-link"><i class="fas fa-arrow-left"></i> Back to home</a>
-        <h2>Create your account</h2>
-        <p class="subtitle">Start your free trial — no credit card needed</p>
+      <section class="form-side">
+        <div class="form-container">
+          <span class="eyebrow dark">New customer account</span>
+          <h2>Create your account</h2>
+          <p class="subtitle">Use your account to submit requests and review order progress online.</p>
 
-        <?php if ($error): ?>
-        <div class="error-banner"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-        <div class="success-banner"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?></div>
-        <?php endif; ?>
+          <?php if ($error): ?>
+            <div class="error-banner"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div>
+          <?php endif; ?>
 
-        <form method="post">
-          <div class="form-group">
-            <label for="full_name">Full Name</label>
-            <div class="input-wrap">
+          <?php if ($success): ?>
+            <div class="success-banner"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?></div>
+          <?php endif; ?>
+
+          <form method="post">
+            <div class="form-group">
+              <label for="full_name">Full Name</label>
+              <div class="input-wrap">
+                <i class="fas fa-user"></i>
+                <input type="text" name="full_name" id="full_name" placeholder="Juan Dela Cruz" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email</label>
+              <div class="input-wrap">
+                <i class="fas fa-envelope"></i>
+                <input type="email" name="email" id="email" placeholder="you@example.com" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="phone_number">Phone Number</label>
+              <div class="input-wrap">
+                <i class="fas fa-phone"></i>
+                <input type="text" name="phone_number" id="phone_number" placeholder="09XX XXX XXXX" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <div class="input-wrap">
+                <i class="fas fa-lock"></i>
+                <input type="password" name="password" id="password" placeholder="Create a password" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="confirm_password">Confirm Password</label>
+              <div class="input-wrap">
+                <i class="fas fa-lock"></i>
+                <input type="password" name="confirm_password" id="confirm_password" placeholder="Repeat your password" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-submit">Create Account</button>
+          </form>
+
+          <div class="form-actions-row">
+            <button type="button" class="demo-trigger" data-modal-open="customer-demo-modal">
               <i class="fas fa-user"></i>
-              <input type="text" name="full_name" id="full_name" placeholder="Juan Dela Cruz" required>
-            </div>
+              Customer demo
+            </button>
           </div>
-          <div class="form-group">
-            <label for="email">Email</label>
-            <div class="input-wrap">
-              <i class="fas fa-envelope"></i>
-              <input type="email" name="email" id="email" placeholder="you@company.com" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="phone_number">Phone Number</label>
-            <div class="input-wrap">
-              <i class="fas fa-phone"></i>
-              <input type="text" name="phone_number" id="phone_number" placeholder="+63 912 345 6789" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="password">Password</label>
-            <div class="input-wrap">
-              <i class="fas fa-lock"></i>
-              <input type="password" name="password" id="password" placeholder="Create a strong password" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="confirm_password">Confirm Password</label>
-            <div class="input-wrap">
-              <i class="fas fa-lock"></i>
-              <input type="password" name="confirm_password" id="confirm_password" placeholder="Repeat your password" required>
-            </div>
-          </div>
-          <button type="submit" class="btn-submit">Create Account</button>
-        </form>
 
-        <div class="demo-section">
-          <div class="demo-title"><i class="fas fa-bolt" style="margin-right:4px"></i> Or try a demo account</div>
-          <div class="demo-grid">
-            <?php $demoColors = [
-              'admin'       => '#050505',
-              'manager'     => '#2b2b2b',
-              'tailor'      => '#f60000',
-              'senior'      => '#b30000',
-              'alteration'  => '#7a0a0a',
-              'pattern'     => '#4a0a0a',
-              'sublimation' => '#f04444',
-              'screenprint' => '#8a1111',
-              'embroidery'  => '#3a3a3a',
-              'qc'          => '#1a1a1a',
-              'packing'     => '#5b5b5b',
-              'production'  => '#cf1010',
-              'shop'        => '#ff4d4d',
-              'inventory'   => '#6b0000',
-              'customer'    => '#8f8f8f',
-            ];
-            $demoIcons = [
-              'admin'       => 'fa-industry',
-              'manager'     => 'fa-chart-line',
-              'tailor'      => 'fa-cut',
-              'senior'      => 'fa-tshirt',
-              'alteration'  => 'fa-pencil-ruler',
-              'pattern'     => 'fa-drafting-compass',
-              'sublimation' => 'fa-print',
-              'screenprint' => 'fa-palette',
-              'embroidery'  => 'fa-thread',
-              'qc'          => 'fa-clipboard-check',
-              'packing'     => 'fa-box',
-              'production'  => 'fa-clipboard-list',
-              'shop'        => 'fa-store',
-              'inventory'   => 'fa-roll',
-              'customer'    => 'fa-user',
-            ];
-            $demoPositions = [
-              ['admin',        'admin@sakuragi.ph',        'admin123', 'Production Manager'],
-              ['manager',      'admin@sakuragi.ph',        'admin123', 'Operations Head'],
-              ['tailor',       'tailor@demo.ph',           'demo123',  'Cutting Team'],
-              ['senior',       'senior@demo.ph',           'demo123',  'Assembly Lead'],
-              ['alteration',   'alteration@demo.ph',       'demo123',  'Alterations'],
-              ['pattern',      'pattern@demo.ph',          'demo123',  'Pattern / Grading'],
-              ['sublimation',  'sublimation@demo.ph',      'demo123',  'Sublimation'],
-              ['screenprint',  'screenprint@demo.ph',      'demo123',  'Screen Printing'],
-              ['embroidery',   'embroidery@demo.ph',       'demo123',  'Embroidery'],
-              ['qc',           'qc@demo.ph',               'demo123',  'QC (AQL Sampling)'],
-              ['packing',      'packing@demo.ph',          'demo123',  'Packing / Labeling'],
-              ['production',   'production@demo.ph',       'demo123',  'Prod. Coordinator'],
-              ['shop',         'shop@demo.ph',             'demo123',  'Sales / Order Intake'],
-              ['inventory',    'inventory@demo.ph',        'demo123',  'Material Handler'],
-              ['customer',     'customer@demo.ph',         'demo123',  'Customer'],
-            ];
-            foreach ($demoPositions as $dp):
-              $key = $dp[0]; $label = $dp[3]; $color = $demoColors[$key] ?? '#6b7280';
-            ?>
-            <form method="post" action="login.php">
-              <input type="hidden" name="email" value="<?= $dp[1] ?>">
-              <input type="hidden" name="password" value="<?= $dp[2] ?>">
-              <button type="submit" class="demo-btn" style="background:<?= $color ?>"><i class="fas <?= $demoIcons[$key] ?? 'fa-user' ?>"></i> <?= $label ?></button>
-            </form>
-            <?php endforeach; ?>
-          </div>
+          <p class="signup-link">Already have an account? <a href="login.php">Sign in</a></p>
         </div>
-
-        <p class="signin-link">Already have an account? <a href="login.php">Sign in</a></p>
-      </div>
+      </section>
     </div>
 
+    <div class="modal-backdrop" data-modal="customer-demo-modal" hidden>
+      <div class="demo-modal demo-modal-compact" role="dialog" aria-modal="true" aria-labelledby="customer-demo-title">
+        <div class="demo-modal-head">
+          <div>
+            <p class="modal-kicker">Sample access</p>
+            <h3 id="customer-demo-title">Customer demo</h3>
+          </div>
+          <button type="button" class="modal-close" aria-label="Close customer demo" data-modal-close>
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        <p class="demo-copy">If you only want to explore the customer dashboard first, use the demo account below.</p>
+        <div class="demo-grid demo-grid-single">
+          <form method="post" action="login.php">
+            <?= csrf_field() ?>
+            <input type="hidden" name="email" value="customer@demo.ph">
+            <input type="hidden" name="password" value="demo123">
+            <button type="submit" class="demo-btn" style="--demo-accent: #7b7b7b">
+              <i class="fas fa-user"></i>
+              <span>Customer Demo</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
+  <script>
+    const modalTriggers = document.querySelectorAll('[data-modal-open]');
+    const modalBackdrops = document.querySelectorAll('[data-modal]');
+
+    function closeModal(modal) {
+      modal.hidden = true;
+      document.body.classList.remove('modal-open');
+    }
+
+    modalTriggers.forEach(trigger => {
+      trigger.addEventListener('click', () => {
+        const modal = document.querySelector(`[data-modal="${trigger.dataset.modalOpen}"]`);
+        if (!modal) return;
+        modal.hidden = false;
+        document.body.classList.add('modal-open');
+      });
+    });
+
+    modalBackdrops.forEach(modal => {
+      modal.addEventListener('click', event => {
+        if (event.target === modal || event.target.closest('[data-modal-close]')) {
+          closeModal(modal);
+        }
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      modalBackdrops.forEach(modal => {
+        if (!modal.hidden) closeModal(modal);
+      });
+    });
+  </script>
 </body>
 </html>

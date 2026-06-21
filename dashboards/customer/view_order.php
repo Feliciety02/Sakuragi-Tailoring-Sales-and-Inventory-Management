@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_customer.php';
+require_once '../../app/Middleware/auth_required.php';
+
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -78,24 +77,40 @@ $customerTimeline = [
 ];
 $currentCustomerIdx = array_search($customerStage, $customerTimeline);
 if ($customerStage === CSTAGE_DONE) $currentCustomerIdx = 5;
+<?php
+$pageTitle = 'Order Details';
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
-<style>
-  body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
-  .timeline-step { display:flex;flex-direction:column;align-items:center;position:relative;flex:1 }
-  .timeline-step:not(:last-child)::after { content:'';position:absolute;top:20px;left:55%;width:90%;height:3px;background:#e5e7eb;z-index:0 }
-  .timeline-step.completed:not(:last-child)::after { background:#10b981 }
-  .timeline-step.active:not(:last-child)::after { background:linear-gradient(90deg,#10b981 50%,#e5e7eb 50%) }
-  .timeline-dot { width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:1;border:3px solid #e5e7eb;background:#fff;color:#9ca3af;transition:all .3s }
-  .timeline-step.completed .timeline-dot { background:#10b981;border-color:#10b981;color:#fff }
-  .timeline-step.active .timeline-dot { border-color:var(--mes-primary);color:var(--mes-primary) }
-  .timeline-label { font-size:11px;text-align:center;margin-top:6px;color:#9ca3af;font-weight:500;max-width:80px }
-  .timeline-step.completed .timeline-label { color:#10b981 }
-  .timeline-step.active .timeline-label { color:var(--mes-primary);font-weight:600 }
-</style>
-
-<div class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Details — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css">
+  <style>
+    body { background: #f5f5f5; }
+    .timeline-step { display:flex;flex-direction:column;align-items:center;position:relative;flex:1 }
+    .timeline-step:not(:last-child)::after { content:'';position:absolute;top:20px;left:55%;width:90%;height:3px;background:#e5e7eb;z-index:0 }
+    .timeline-step.completed:not(:last-child)::after { background:#10b981 }
+    .timeline-step.active:not(:last-child)::after { background:linear-gradient(90deg,#10b981 50%,#e5e7eb 50%) }
+    .timeline-dot { width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:1;border:3px solid #e5e7eb;background:#fff;color:#9ca3af;transition:all .3s }
+    .timeline-step.completed .timeline-dot { background:#10b981;border-color:#10b981;color:#fff }
+    .timeline-step.active .timeline-dot { border-color:var(--mes-primary);color:var(--mes-primary) }
+    .timeline-label { font-size:11px;text-align:center;margin-top:6px;color:#9ca3af;font-weight:500;max-width:80px }
+    .timeline-step.completed .timeline-label { color:#10b981 }
+    .timeline-step.active .timeline-label { color:var(--mes-primary);font-weight:600 }
+  </style>
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
     <a href="my_orders.php" style="color:var(--mes-primary)">My Orders</a>
     <span>/</span>
@@ -243,6 +258,14 @@ if ($customerStage === CSTAGE_DONE) $currentCustomerIdx = 5;
       <?php endif; ?>
     </div>
   </div>
+    </div>
+  </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

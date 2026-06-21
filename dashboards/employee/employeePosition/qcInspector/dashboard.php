@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/db_connect.php';
-require_once '../../../../middleware/auth_required.php';
+require_once '../../../../app/Middleware/auth_required.php';
 
 $user_id = $_SESSION['user_id'];
 
@@ -15,8 +15,7 @@ if ($posName !== 'Quality Control Inspector') {
     exit();
 }
 
-require_once '../../../../includes/header.php';
-require_once '../../../../includes/sidebar_qc_inspector.php';
+$pageTitle = 'QC Dashboard';
 
 // Stats
 $pendingCount = $pdo->query("SELECT COUNT(*) FROM order_workflow WHERE stage = 'Quality Inspection'")->fetchColumn();
@@ -40,52 +39,100 @@ $pendingQC = $pdo->query("
     ORDER BY ow.expected_completion ASC
 ");
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
-<style>
-  body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; min-height: 100vh; }
-  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QC Dashboard — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <style>
+    .mes-stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+    .mes-stat { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 20px; }
+    .mes-stat-label { font-size: .8rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 4px; }
+    .mes-stat-value { font-size: 1.75rem; font-weight: 800; color: var(--text-primary); }
+    .mes-card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); }
+    .mes-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .mes-card-title { font-size: 1rem; font-weight: 700; margin: 0; }
+    .mes-card-body { padding: 20px; }
+    .mes-badge { font-size: .7rem; font-weight: 600; padding: 2px 10px; border-radius: 100px; }
+    .mes-badge-danger { background: #fee2e2; color: #991b1b; }
+    .mes-badge-warning { background: #fef3c7; color: #92400e; }
+    .mes-badge-gray { background: #f1f5f9; color: #475569; }
+    .mes-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-size: .85rem; font-weight: 600; font-family: inherit; border: none; cursor: pointer; transition: .2s; text-decoration: none; }
+    .mes-btn-primary { background: var(--accent); color: #fff; }
+    .mes-btn-primary:hover { background: var(--accent-blue); }
+  </style>
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
+      <div class="page-header">
+        <h1>QC Dashboard</h1>
+        <p>Welcome, <?= htmlspecialchars($_SESSION['full_name']) ?></p>
+      </div>
 
-<div class="main-content">
-  <div class="mb-4">
-    <h1 style="font-size:20px;font-weight:700;margin:0">QC Dashboard</h1>
-    <p style="font-size:13px;color:#6b7280;margin-top:4px">Welcome, <?= htmlspecialchars($_SESSION['full_name']) ?></p>
-  </div>
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-hourglass-half"></i></div>
+          <div class="kpi-label">Pending Inspection</div>
+          <div class="kpi-value"><?= $pendingCount ?></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fas fa-clipboard-check"></i></div>
+          <div class="kpi-label">Inspected Today</div>
+          <div class="kpi-value"><?= $inspectedToday ?></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#d1fae5;color:#059669"><i class="fas fa-check-circle"></i></div>
+          <div class="kpi-label">Passed</div>
+          <div class="kpi-value"><?= $passedToday ?></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fas fa-times-circle"></i></div>
+          <div class="kpi-label">Failed</div>
+          <div class="kpi-value"><?= $failedToday ?></div>
+        </div>
+      </div>
 
-  <div class="mes-stat-row">
-    <div class="mes-stat"><div class="mes-stat-label">Pending Inspection</div><div class="mes-stat-value"><?= $pendingCount ?></div></div>
-    <div class="mes-stat"><div class="mes-stat-label">Inspected Today</div><div class="mes-stat-value" style="color:var(--mes-primary)"><?= $inspectedToday ?></div></div>
-    <div class="mes-stat"><div class="mes-stat-label">Passed</div><div class="mes-stat-value" style="color:var(--mes-success)"><?= $passedToday ?></div></div>
-    <div class="mes-stat"><div class="mes-stat-label">Failed</div><div class="mes-stat-value" style="color:var(--mes-danger)"><?= $failedToday ?></div></div>
-  </div>
-
-  <div class="mes-card">
-    <div class="mes-card-header"><h3 class="mes-card-title">Awaiting Inspection</h3></div>
-    <div class="mes-card-body">
-      <?php if ($pendingQC->rowCount() === 0): ?>
-      <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:24px 0">No orders pending inspection</p>
-      <?php else: ?>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">
-        <?php foreach ($pendingQC as $o): ?>
-        <div class="mes-card" style="border-left:3px solid <?= ($o['priority']??'medium') === 'urgent' ? 'var(--mes-danger)' : (($o['priority']??'medium') === 'high' ? 'var(--mes-warning)' : 'var(--mes-info)') ?>">
-          <div class="mes-card-body" style="padding:16px">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <strong style="font-size:14px">#ORD-<?= $o['order_id'] ?></strong>
+      <div class="panel-card">
+        <h3><i class="fas fa-search" style="color:var(--accent-blue)"></i> Awaiting Inspection</h3>
+        <?php if ($pendingQC->rowCount() === 0): ?>
+        <div style="font-size:.8rem;color:var(--text-tertiary);text-align:center;padding:16px 0">No orders pending inspection</div>
+        <?php else: ?>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">
+          <?php foreach ($pendingQC as $o): ?>
+          <div class="task-card" style="border-left:3px solid <?= ($o['priority']??'medium') === 'urgent' ? 'var(--accent-red)' : (($o['priority']??'medium') === 'high' ? 'var(--accent-amber)' : 'var(--accent-blue)') ?>">
+            <div class="task-header">
+              <span class="task-id">#ORD-<?= $o['order_id'] ?></span>
               <?php if ($o['priority']): ?>
-              <span class="mes-badge <?= $o['priority'] === 'urgent' ? 'mes-badge-danger' : ($o['priority'] === 'high' ? 'mes-badge-warning' : 'mes-badge-gray') ?>"><?= ucfirst($o['priority']) ?></span>
+              <span class="qc-status <?= $o['priority'] === 'urgent' ? 'failed' : ($o['priority'] === 'high' ? 'pending' : 'passed') ?>"><?= ucfirst($o['priority']) ?></span>
               <?php endif; ?>
             </div>
-            <p style="font-size:13px;margin:0;color:#374151"><?= htmlspecialchars($o['product_type'] ?? 'Garment') ?></p>
-            <p style="font-size:12px;color:#6b7280;margin:2px 0 8px"><?= htmlspecialchars($o['customer_name']) ?> · by <?= htmlspecialchars($o['employee_name'] ?? 'Unassigned') ?></p>
-            <a href="inspect.php?order_id=<?= $o['order_id'] ?>" class="mes-btn mes-btn-primary mes-btn-sm"><i class="fas fa-search"></i> Inspect</a>
+            <div class="task-meta"><?= htmlspecialchars($o['product_type'] ?? 'Garment') ?> · <?= htmlspecialchars($o['customer_name']) ?> · by <?= htmlspecialchars($o['employee_name'] ?? 'Unassigned') ?></div>
+            <div class="task-actions">
+              <a href="inspect.php?order_id=<?= $o['order_id'] ?>" class="dash-btn dash-btn-primary dash-btn-sm"><i class="fas fa-search"></i> Inspect</a>
+            </div>
           </div>
+          <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
+        <?php endif; ?>
       </div>
-      <?php endif; ?>
+
     </div>
   </div>
 </div>
 
-<?php require_once '../../../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

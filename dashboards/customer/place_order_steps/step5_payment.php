@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '../../../../config/db_connect.php';
-require_once __DIR__ . '../../../../config/session_handler.php';
+require_once __DIR__ . '/../../../config/db_connect.php';
+require_once __DIR__ . '/../../../config/session_handler.php';
 ?>
 
 <h5 class="mb-3 fw-bold text-center">Step 5: Payment</h5>
@@ -13,7 +13,7 @@ require_once __DIR__ . '../../../../config/session_handler.php';
                 <div id="paymentDetails" class="mt-4">
                     <div class="payment-info">
                         <div class="qr-code text-center mb-3">
-                            <img src="../../../public/assets/images/gcash-qr.png" 
+                            <img src="/public/assets/images/gcash-qr.png" 
                                  alt="GCash QR Code" class="img-fluid gcash-qr-sm">
                         </div>
                         <div class="account-details">

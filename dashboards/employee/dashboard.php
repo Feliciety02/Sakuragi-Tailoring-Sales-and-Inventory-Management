@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
+require_once '../../app/Middleware/auth_required.php';
+require_once '../../app/Support/helpers.php';
 
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
@@ -11,6 +12,12 @@ if (get_user_role() === ROLE_CUSTOMER) {
 
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Employee';
+$dashboardContext = get_user_position_context($pdo, (int) $user_id);
+
+if ($dashboardContext['sidebar'] !== 'employee') {
+    header('Location: ' . $dashboardContext['dashboard']);
+    exit();
+}
 
 $position = getEmployeePosition($pdo, $user_id);
 $position_id = $position ? (int)$position['position_id'] : 0;

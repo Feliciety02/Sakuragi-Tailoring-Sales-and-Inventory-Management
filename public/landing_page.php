@@ -23,5 +23,94 @@
   </main>
 
   <?php require __DIR__ . '/partials/landing/footer.php'; ?>
+
+  <script>
+    const sections = document.querySelectorAll('section[id], .hero');
+    const navLinks = document.querySelectorAll('.nav-links a:not(.btn-nav):not(.btn-primary-nav)');
+    const proofCarousel = document.querySelector('[data-proof-carousel]');
+
+    function setActiveLink() {
+      let current = '';
+      sections.forEach(s => {
+        const top = s.getBoundingClientRect().top;
+        if (top <= 200) current = s.id || 'hero';
+      });
+      navLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+      });
+    }
+
+    window.addEventListener('scroll', setActiveLink, { passive: true });
+    window.addEventListener('load', setActiveLink);
+
+    function initCarousel(carouselEl, viewportSel, cardSel, prevAttr, nextAttr) {
+      if (!carouselEl) return;
+      const viewport = carouselEl.querySelector(viewportSel);
+      const prev = carouselEl.querySelector(prevAttr);
+      const next = carouselEl.querySelector(nextAttr);
+
+      const getStep = () => {
+        const firstCard = viewport.querySelector(cardSel);
+        if (!firstCard) return viewport.clientWidth;
+        const cardWidth = firstCard.getBoundingClientRect().width;
+        return cardWidth + 18;
+      };
+
+      const scrollByStep = direction => {
+        viewport.scrollBy({
+          left: getStep() * direction,
+          behavior: 'smooth'
+        });
+      };
+
+      prev?.addEventListener('click', () => scrollByStep(-1));
+      next?.addEventListener('click', () => scrollByStep(1));
+
+      let autoSlide = window.setInterval(() => {
+        const maxScrollLeft = viewport.scrollWidth - viewport.clientWidth - 4;
+        if (viewport.scrollLeft >= maxScrollLeft) {
+          viewport.scrollTo({ left: 0, behavior: 'smooth' });
+          return;
+        }
+        scrollByStep(1);
+      }, 4000);
+
+      const pauseAutoSlide = () => {
+        if (autoSlide) {
+          window.clearInterval(autoSlide);
+          autoSlide = null;
+        }
+      };
+
+      const resumeAutoSlide = () => {
+        if (autoSlide) return;
+        autoSlide = window.setInterval(() => {
+          const maxScrollLeft = viewport.scrollWidth - viewport.clientWidth - 4;
+          if (viewport.scrollLeft >= maxScrollLeft) {
+            viewport.scrollTo({ left: 0, behavior: 'smooth' });
+            return;
+          }
+          scrollByStep(1);
+        }, 4000);
+      };
+
+      carouselEl.addEventListener('mouseenter', pauseAutoSlide);
+      carouselEl.addEventListener('mouseleave', resumeAutoSlide);
+      carouselEl.addEventListener('focusin', pauseAutoSlide);
+      carouselEl.addEventListener('focusout', resumeAutoSlide);
+    }
+
+    initCarousel(
+      document.querySelector('[data-review-carousel]'),
+      '.review-viewport', '.review-card',
+      '[data-review-prev]', '[data-review-next]'
+    );
+
+    initCarousel(
+      proofCarousel,
+      '.proof-viewport', '.proof-card',
+      '[data-proof-prev]', '[data-proof-next]'
+    );
+  </script>
 </body>
 </html>

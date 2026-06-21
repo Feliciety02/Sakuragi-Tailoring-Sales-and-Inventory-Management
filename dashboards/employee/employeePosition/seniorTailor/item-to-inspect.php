@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
-require_once '../../../../middleware/auth_required.php';
+require_once '../../../../app/Middleware/auth_required.php';
 require_once '../../../../config/db_connect.php';
 // Get user position
 $user_id = $_SESSION['user_id'];
@@ -33,19 +33,19 @@ try {
     exit();
 }
 
-require_once '../../../../includes/header.php';
-require_once '../../../../includes/sidebar_senior_tailor.php';
+$pageTitle = 'Items to Inspect';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Items to Inspect - Senior Tailor</title>
-    <link rel="stylesheet" href="/public/assets/css/enhanced-sidebar.css">
-    <script src="/public/assets/js/enhanced-sidebar.js"></script>
-    <style>
-        /* Basic styling for layout */
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Items to Inspect — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <style>
         :root {
             --primary-color: #4a6fdc;
             --primary-light: #e8f0ff;
@@ -62,17 +62,6 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
             color: var(--text-dark);
             background-color: #f5f7fa;
             line-height: 1.6;
-        }
-        
-        #main-content {
-            margin-left: 250px;
-            padding: 30px;
-            transition: margin-left 0.3s ease;
-            max-width: 1400px;
-        }
-        
-        .sidebar.collapsed ~ #main-content {
-            margin-left: 70px;
         }
         
         h1 {
@@ -255,7 +244,11 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
     </style>
 </head>
 <body>
-    <div id="main-content">
+<div class="dash-layout">
+  <?php require_once '../../../../app/Views/Shared/Sidebars/senior_tailor.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
         <h1>Items to Inspect</h1>
         <p>Review and quality check items submitted for inspection</p>
         
@@ -411,6 +404,8 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
             </div>
         </div>
     </div>
+  </div>
+</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -443,7 +438,7 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
             // Adjust layout based on sidebar
             function adjustLayout() {
                 const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
+                const mainContent = document.querySelector('.dash-content');
                 
                 if (sidebar && mainContent) {
                     if (sidebar.classList.contains('collapsed')) {
@@ -467,6 +462,11 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
             window.addEventListener('resize', adjustLayout);
         });
     </script>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
 </body>
 </html>
 

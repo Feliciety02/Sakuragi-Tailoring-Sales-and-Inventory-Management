@@ -2,10 +2,9 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_customer.php';
-require_once __DIR__ . '/../../controller/NotificationController.php';
+require_once '../../app/Middleware/auth_required.php';
+
+require_once __DIR__ . '/../../app/Controllers/NotificationController.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -28,8 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
     header('Location: notifications.php');
     exit();
 }
+<?php
+$pageTitle = 'Notifications';
 ?>
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
     <div class="container-fluid mb-4">
         <div class="row align-items-center">
             <div class="col">
@@ -74,5 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
             </div>
         </div>
     </div>
-</main>
-<?php require_once '../../includes/footer.php'; ?>
+</div>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

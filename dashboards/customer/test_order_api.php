@@ -5,8 +5,8 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../controller/OrderController.php';
+require_once '../../app/Middleware/auth_required.php';
+require_once '../../app/Controllers/OrderController.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     echo 'Unauthorized access';

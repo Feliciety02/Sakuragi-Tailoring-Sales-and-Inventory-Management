@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/db_connect.php';
-require_once '../../../../middleware/auth_required.php';
+require_once '../../../../app/Middleware/auth_required.php';
 
 $user_id = $_SESSION['user_id'];
 
@@ -14,8 +14,7 @@ if ($posName !== 'Quality Control Inspector') {
     exit();
 }
 
-require_once '../../../../includes/header.php';
-require_once '../../../../includes/sidebar_qc_inspector.php';
+$pageTitle = 'Inspect Item';
 
 $order_id = (int)($_GET['order_id'] ?? $_POST['order_id'] ?? 0);
 $message = '';
@@ -96,113 +95,130 @@ $order = $pdo->prepare("
 $order->execute([$order_id]);
 $ord = $order->fetch();
 
-if (!$ord) {
-    echo "<div class='main-content'><p style='padding:24px;color:#6b7280'>Order not found. <a href='dashboard.php'>Back to dashboard</a></p></div>";
-    require_once '../../../../includes/footer.php';
-    exit();
-}
+$order_not_found = !$ord;
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
-<style>
-  body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; min-height: 100vh; }
-  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inspect Item — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css">
+  <style>
+    body { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
 
-<div class="main-content">
-  <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
-    <a href="dashboard.php" style="color:var(--mes-primary)">QC Dashboard</a>
-    <span>/</span>
-    <span style="color:#374151">Inspect #ORD-<?= $order_id ?></span>
-  </div>
+<?php if ($order_not_found): ?>
+      <p style="padding:24px;color:#6b7280;text-align:center">Order not found. <a href="dashboard.php">Back to dashboard</a></p>
+<?php else: ?>
 
-  <?php if ($message): ?>
-  <div class="mes-card mb-3" style="padding:12px 20px;background:<?= strpos($message,'Error')!==false ? '#fef2f2' : '#d1fae5' ?>;border-color:<?= strpos($message,'Error')!==false ? '#fecaca' : '#a7f3d0' ?>">
-    <p style="margin:0;font-size:13px;color:<?= strpos($message,'Error')!==false ? '#991b1b' : '#065f46' ?>"><?= htmlspecialchars($message) ?></p>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($ord['qc_result'] && $ord['qc_result'] !== 'Pending'): ?>
-  <div class="mes-card mb-3" style="padding:12px 20px;background:#fef3c7;border-color:#fde68a">
-    <p style="margin:0;font-size:13px;color:#92400e">This order was already inspected — result: <strong><?= $ord['qc_result'] ?></strong>. Submitting again will overwrite.</p>
-  </div>
-  <?php endif; ?>
-
-  <div class="mes-layout">
-    <div class="mes-main">
-      <div class="mes-card mb-3">
-        <div class="mes-card-body" style="padding:20px 24px">
-          <h2 style="font-size:18px;font-weight:700;margin:0">#ORD-<?= $ord['order_id'] ?> — <?= htmlspecialchars($ord['product_type'] ?? 'Garment') ?></h2>
-          <p style="font-size:13px;color:#6b7280;margin:4px 0 0">
-            <?= htmlspecialchars($ord['customer_name']) ?> · 
-            Assigned: <?= htmlspecialchars($ord['employee_name'] ?? 'Unassigned') ?> · 
-            Stage: <?= htmlspecialchars($ord['stage']) ?>
-          </p>
-        </div>
+      <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
+        <a href="dashboard.php" style="color:var(--mes-primary)">QC Dashboard</a>
+        <span>/</span>
+        <span style="color:#374151">Inspect #ORD-<?= $order_id ?></span>
       </div>
 
-      <div class="mes-card">
-        <div class="mes-card-header"><h3 class="mes-card-title">QC Inspection Form</h3></div>
-        <div class="mes-card-body">
-          <form method="post">
-            <input type="hidden" name="order_id" value="<?= $order_id ?>">
+      <?php if ($message): ?>
+      <div class="mes-card mb-3" style="padding:12px 20px;background:<?= strpos($message,'Error')!==false ? '#fef2f2' : '#d1fae5' ?>;border-color:<?= strpos($message,'Error')!==false ? '#fecaca' : '#a7f3d0' ?>">
+        <p style="margin:0;font-size:13px;color:<?= strpos($message,'Error')!==false ? '#991b1b' : '#065f46' ?>"><?= htmlspecialchars($message) ?></p>
+      </div>
+      <?php endif; ?>
 
-            <div class="mes-form-group">
-              <label class="mes-form-label">Result</label>
-              <select name="result" class="mes-form-select" id="resultSelect" required>
-                <option value="Passed">Passed</option>
-                <option value="Failed">Failed</option>
-              </select>
+      <?php if ($ord['qc_result'] && $ord['qc_result'] !== 'Pending'): ?>
+      <div class="mes-card mb-3" style="padding:12px 20px;background:#fef3c7;border-color:#fde68a">
+        <p style="margin:0;font-size:13px;color:#92400e">This order was already inspected — result: <strong><?= $ord['qc_result'] ?></strong>. Submitting again will overwrite.</p>
+      </div>
+      <?php endif; ?>
+
+      <div class="mes-layout">
+        <div class="mes-main">
+          <div class="mes-card mb-3">
+            <div class="mes-card-body" style="padding:20px 24px">
+              <h2 style="font-size:18px;font-weight:700;margin:0">#ORD-<?= $ord['order_id'] ?> — <?= htmlspecialchars($ord['product_type'] ?? 'Garment') ?></h2>
+              <p style="font-size:13px;color:#6b7280;margin:4px 0 0">
+                <?= htmlspecialchars($ord['customer_name']) ?> · 
+                Assigned: <?= htmlspecialchars($ord['employee_name'] ?? 'Unassigned') ?> · 
+                Stage: <?= htmlspecialchars($ord['stage']) ?>
+              </p>
             </div>
+          </div>
 
-            <div class="mes-form-group">
-              <label class="mes-form-label">Inspection Checklist</label>
-              <div class="mes-checklist">
-                <?php $items = ['design_accuracy'=>'Design Accuracy','print_alignment'=>'Print / Embroidery Alignment','embroidery_quality'=>'Embroidery Quality','stitching_quality'=>'Stitching Quality','size_accuracy'=>'Size Accuracy','fabric_condition'=>'Fabric Condition','cleanliness'=>'Cleanliness','packaging_readiness'=>'Packaging Readiness'];
-                foreach ($items as $key => $label): ?>
-                <label class="mes-checklist-item">
-                  <input type="checkbox" name="<?= $key ?>" value="1">
-                  <span><?= $label ?></span>
-                </label>
-                <?php endforeach; ?>
+          <div class="mes-card">
+            <div class="mes-card-header"><h3 class="mes-card-title">QC Inspection Form</h3></div>
+            <div class="mes-card-body">
+              <form method="post">
+                <input type="hidden" name="order_id" value="<?= $order_id ?>">
+
+                <div class="mes-form-group">
+                  <label class="mes-form-label">Result</label>
+                  <select name="result" class="mes-form-select" id="resultSelect" required>
+                    <option value="Passed">Passed</option>
+                    <option value="Failed">Failed</option>
+                  </select>
+                </div>
+
+                <div class="mes-form-group">
+                  <label class="mes-form-label">Inspection Checklist</label>
+                  <div class="mes-checklist">
+                    <?php $items = ['design_accuracy'=>'Design Accuracy','print_alignment'=>'Print / Embroidery Alignment','embroidery_quality'=>'Embroidery Quality','stitching_quality'=>'Stitching Quality','size_accuracy'=>'Size Accuracy','fabric_condition'=>'Fabric Condition','cleanliness'=>'Cleanliness','packaging_readiness'=>'Packaging Readiness'];
+                    foreach ($items as $key => $label): ?>
+                    <label class="mes-checklist-item">
+                      <input type="checkbox" name="<?= $key ?>" value="1">
+                      <span><?= $label ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+
+                <div class="mes-form-group">
+                  <label class="mes-form-label">Feedback</label>
+                  <textarea name="feedback" class="mes-form-textarea" rows="2" placeholder="Overall feedback..."></textarea>
+                </div>
+
+                <div class="mes-form-group" id="failureFields" style="display:none">
+                  <label class="mes-form-label">Failure Reason</label>
+                  <input type="text" name="failure_reason" class="mes-form-input" placeholder="e.g. Stitching issue">
+                  <label class="mes-form-label mt-2">Required Corrections</label>
+                  <textarea name="required_corrections" class="mes-form-textarea" rows="2" placeholder="What needs to be fixed?"></textarea>
+                </div>
+
+                <button type="submit" name="submit_qc" class="mes-btn mes-btn-primary mt-2"><i class="fas fa-check"></i> Submit Inspection</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="mes-sidebar-right">
+          <div class="mes-card mb-3">
+            <div class="mes-card-header"><h3 class="mes-card-title">Checklist Items</h3></div>
+            <div class="mes-card-body" style="font-size:13px">
+              <p style="margin-bottom:8px;color:#6b7280">Check each item that passes inspection:</p>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div>1. Design Accuracy</div>
+                <div>2. Print / Embroidery Alignment</div>
+                <div>3. Embroidery Quality</div>
+                <div>4. Stitching Quality</div>
+                <div>5. Size Accuracy</div>
+                <div>6. Fabric Condition</div>
+                <div>7. Cleanliness</div>
+                <div>8. Packaging Readiness</div>
               </div>
             </div>
-
-            <div class="mes-form-group">
-              <label class="mes-form-label">Feedback</label>
-              <textarea name="feedback" class="mes-form-textarea" rows="2" placeholder="Overall feedback..."></textarea>
-            </div>
-
-            <div class="mes-form-group" id="failureFields" style="display:none">
-              <label class="mes-form-label">Failure Reason</label>
-              <input type="text" name="failure_reason" class="mes-form-input" placeholder="e.g. Stitching issue">
-              <label class="mes-form-label mt-2">Required Corrections</label>
-              <textarea name="required_corrections" class="mes-form-textarea" rows="2" placeholder="What needs to be fixed?"></textarea>
-            </div>
-
-            <button type="submit" name="submit_qc" class="mes-btn mes-btn-primary mt-2"><i class="fas fa-check"></i> Submit Inspection</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="mes-sidebar-right">
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Checklist Items</h3></div>
-        <div class="mes-card-body" style="font-size:13px">
-          <p style="margin-bottom:8px;color:#6b7280">Check each item that passes inspection:</p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <div>1. Design Accuracy</div>
-            <div>2. Print / Embroidery Alignment</div>
-            <div>3. Embroidery Quality</div>
-            <div>4. Stitching Quality</div>
-            <div>5. Size Accuracy</div>
-            <div>6. Fabric Condition</div>
-            <div>7. Cleanliness</div>
-            <div>8. Packaging Readiness</div>
           </div>
         </div>
       </div>
+<?php endif; ?>
     </div>
   </div>
 </div>
@@ -212,5 +228,10 @@ document.getElementById('resultSelect')?.addEventListener('change', function() {
   document.getElementById('failureFields').style.display = this.value === 'Failed' ? 'block' : 'none';
 });
 </script>
-
-<?php require_once '../../../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

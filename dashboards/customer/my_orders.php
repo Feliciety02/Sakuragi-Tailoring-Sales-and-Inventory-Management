@@ -2,10 +2,9 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_customer.php';
-require_once '../../controller/OrderController.php';
+require_once '../../app/Middleware/auth_required.php';
+
+require_once '../../app/Controllers/OrderController.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -23,10 +22,27 @@ try {
     error_log('Error fetching orders: ' . $e->getMessage());
     $orders = [];
 }
+<?php
+$pageTitle = 'My Orders';
 ?>
-
-<link rel="stylesheet" href="../../public/assets/css/order.css">
-<main class="main-content">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Orders — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/order.css">
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
     <h5 class="page-title">My Orders</h5>
     <p class="page-subtext">Track your orders, design type, status, and staff handling them.</p>
 
@@ -87,7 +103,7 @@ try {
             </table>
         </div>
     </div>
-</main>
+</div>
 
 <!-- Order Details Modal -->
 <div id="orderModal" class="modal">
@@ -109,8 +125,18 @@ try {
     </div>
 </div>
 
-<script src="../../public/assets/js/order.js"></script>
+<script src="/public/assets/js/order.js"></script>
 
-<?php require_once '../../includes/footer.php'; ?>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>
 
 

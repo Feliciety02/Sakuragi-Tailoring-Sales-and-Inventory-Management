@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
-require_once '../../../../middleware/auth_required.php';
+require_once '../../../../app/Middleware/auth_required.php';
 require_once '../../../../config/db_connect.php';
 // Get user position
 $user_id = $_SESSION['user_id'];
@@ -33,27 +33,25 @@ try {
     exit();
 }
 
-require_once '../../../../includes/header.php';
-require_once '../../../../includes/sidebar_senior_tailor.php';
+$pageTitle = 'Inspection Records';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inspection History - Senior Tailor</title>
-    <!-- Enhanced sidebar functionality -->
-   
-      <link rel="stylesheet" href="/public/assets/css/enhanced-sidebar.css">
-    <script src="/public/assets/js/enhanced-sidebar.js"></script>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inspection Records — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
 </head>
 <body>
-    <div class="main-content">
+<div class="dash-layout">
+  <?php require_once '../../../../app/Views/Shared/Sidebars/senior_tailor.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
         <div class="container">
         <h1 class="page-title">Inspection History</h1>
         <p class="page-subtitle">View your complete quality inspection history</p>
@@ -193,18 +191,17 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
             </div>
         </div>
     </div>
-    
-    <!-- Bootstrap JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </div>
+</div>
+
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
 </body>
 </html>
 <style>/* Main Layout */
-.main-content {
-    padding: 2rem;
-    background-color: #f8f9fa;
-    min-height: 100vh;
-}
-
 /* Page Header */
 .page-title {
     font-size: 1.8rem;
@@ -419,9 +416,6 @@ require_once '../../../../includes/sidebar_senior_tailor.php';
 }
 
 @media (max-width: 768px) {
-    .main-content {
-        padding: 1rem;
-    }
     
     .filter-section, .btn-group, .export-btn {
         width: 100%;

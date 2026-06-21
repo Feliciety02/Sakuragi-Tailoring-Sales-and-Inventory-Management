@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_employee.php';
+require_once '../../app/Middleware/auth_required.php';
+$pageTitle = 'Kanban Board';
 
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
@@ -44,11 +43,18 @@ $orders = $pdo->prepare("
 $orders->execute(array_merge([$user_id], $stage_params));
 $allOrders = $orders->fetchAll();
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
-<style>
-  body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; min-height: 100vh; }
-  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css">
+  <style>
   .kanban-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; min-height: 60vh; }
   .kanban-column { min-width: 240px; max-width: 280px; flex-shrink: 0; }
   .kanban-column-header { padding: 12px 16px; font-size: 13px; font-weight: 600; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; }
@@ -59,9 +65,14 @@ $allOrders = $orders->fetchAll();
   .kanban-card .customer-name { font-size: 12px; color: #6b7280; }
   .kanban-card .meta-row { font-size: 11px; color: #9ca3af; margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .kanban-empty { font-size: 12px; color: #9ca3af; text-align: center; padding: 24px 8px; }
-</style>
-
-<div class="main-content">
+  </style>
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
       <h1 style="font-size:20px;font-weight:700;margin:0">My Kanban Board</h1>
@@ -113,5 +124,13 @@ $allOrders = $orders->fetchAll();
     <?php endforeach; ?>
   </div>
 </div>
+  </div>
+</div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

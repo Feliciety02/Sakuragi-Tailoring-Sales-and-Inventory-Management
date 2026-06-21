@@ -2,9 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
-require_once '../../middleware/auth_required.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar_employee.php';
+require_once '../../app/Middleware/auth_required.php';
+$pageTitle = 'View Task';
 
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
@@ -84,17 +83,29 @@ $progress = getStageProgress($task['stage']);
 $daysRemaining = $task['expected_completion'] ? max(0, (strtotime($task['expected_completion']) - time()) / 86400) : null;
 $isOverdue = $task['expected_completion'] && strtotime($task['expected_completion']) < time();
 ?>
-<link rel="stylesheet" href="/public/assets/css/mes.css">
-<style>
-  body { background: #f5f5f5; }
-  .main-content { margin-left: 220px; padding: 24px 32px; background: #f5f5f5; }
-  @media (max-width: 768px) { .main-content { margin-left: 0; padding: 16px; } }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>View Task — Sakuragi</title>
+  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/mes.css">
+  <style>
   .mes-timeline-dot { width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px }
   .mes-timeline-line { width:2px;flex-shrink:0;margin-left:5px;min-height:24px;background:#e5e7eb }
   .mes-timeline-line.active { background:var(--mes-primary) }
-</style>
-
-<div class="main-content">
+  </style>
+</head>
+<body>
+<div class="dash-layout">
+  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <div class="dash-main">
+    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
+    <div class="dash-content">
   <!-- Breadcrumb -->
   <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
     <a href="dashboard.php" style="color:var(--mes-primary)">Dashboard</a>
@@ -355,13 +366,15 @@ $isOverdue = $task['expected_completion'] && strtotime($task['expected_completio
     </div>
   </div>
 </div>
+  </div>
+</div>
 
 <script>
 // Quick note via AJAX
 document.getElementById('noteForm')?.addEventListener('submit', async function(e) {
   e.preventDefault();
   const fd = new FormData(this);
-  const res = await fetch('/controller/production_api.php', { method: 'POST', body: fd });
+  const res = await fetch('/app/Controllers/production_api.php', { method: 'POST', body: fd });
   const data = await res.json();
   if (data.success) {
     location.reload();
@@ -374,7 +387,7 @@ document.getElementById('noteForm')?.addEventListener('submit', async function(e
 document.getElementById('mediaForm')?.addEventListener('submit', async function(e) {
   e.preventDefault();
   const fd = new FormData(this);
-  const res = await fetch('/controller/production_api.php', { method: 'POST', body: fd });
+  const res = await fetch('/app/Controllers/production_api.php', { method: 'POST', body: fd });
   const data = await res.json();
   if (data.success) {
     location.reload();
@@ -384,4 +397,10 @@ document.getElementById('mediaForm')?.addEventListener('submit', async function(
 });
 </script>
 
-<?php require_once '../../includes/footer.php'; ?>
+<script>
+document.getElementById('menuToggle')?.addEventListener('click', function() {
+  document.getElementById('sidebar')?.classList.toggle('collapsed');
+});
+</script>
+</body>
+</html>

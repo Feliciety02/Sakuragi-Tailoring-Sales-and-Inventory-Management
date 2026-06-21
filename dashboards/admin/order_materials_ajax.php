@@ -1,7 +1,8 @@
 <?php
-session_start();
-require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
+require_once __DIR__ . '/../../app/Middleware/role_admin_only.php';
 
 $order_id = (int)($_GET['order_id'] ?? 0);
 if (!$order_id) { echo '<div class="alert alert-danger">Invalid order.</div>'; exit; }

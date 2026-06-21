@@ -424,6 +424,10 @@
     margin: 0 auto;
 }
 
+@media (max-width: 480px) {
+    .preview-wrapper { max-width: 100%; }
+}
+
 #imagePreview {
     max-height: 200px;
     object-fit: contain;
@@ -498,10 +502,15 @@ payment-container {
 
 .gcash-qr-sm {
     max-width: 200px;
+    width: 100%;
     border-radius: 8px;
     border: 1px solid #dee2e6;
     padding: 8px;
     background: white;
+}
+
+@media (max-width: 480px) {
+    .gcash-qr-sm { max-width: 160px; }
 }
 
 .payment-info {

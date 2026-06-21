@@ -1,10 +1,6 @@
 <aside class="sidebar-modern" id="sidebar">
   <div class="sidebar-brand">
-    <svg viewBox="0 0 28 28" fill="none" style="width:24px;height:24px">
-      <rect width="28" height="28" rx="6" fill="#1e3a5f"/>
-      <path d="M7 10h14l-3 8H10L7 10z" fill="#fff" opacity=".9"/>
-    </svg>
-    <span>Sakuragi</span>
+    <img src="/public/assets/images/sakuragi-logo.svg" alt="Sakuragi" class="sidebar-logo">
   </div>
   <nav class="sidebar-nav">
     <div class="section-label">Operations</div>

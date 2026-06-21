@@ -4,21 +4,13 @@
 
   <div class="container hero-shell">
     <div class="hero-copy fade-up">
-      <div class="hero-tag">
-        <i class="fas fa-star"></i>
-        Custom tailoring, alterations, sublimation, and order updates
-      </div>
-
-      <h1>Professional tailoring for customers who want reliable results.</h1>
-      <p>
-        Bring your measurements, design requests, and production needs to Sakuragi. From custom garments to
-        alterations and sublimation work, we keep your order clear, organized, and easier to follow.
-      </p>
+      <h1>Custom uniforms and tailoring, done properly.</h1>
+      <p>Sakuragi handles team uniforms, made-to-order garments, alterations, and sublimation work with clear coordination from inquiry to release.</p>
 
       <div class="hero-actions">
         <a href="/auth/register.php" class="btn btn-primary">
           <i class="fas fa-user-plus"></i>
-          Book With Sakuragi
+          Start an Order
         </a>
         <a href="/auth/login.php" class="btn btn-secondary">
           <i class="fas fa-receipt"></i>
@@ -28,21 +20,19 @@
 
       <div class="hero-stats">
         <div class="stat-pill">
-          <strong>Customer-first service</strong>
-          <span>Clear fitting notes, garment details, and order progress in one place.</span>
+          <span class="stat-icon"><i class="fas fa-ruler-combined"></i></span>
+          <div>
+            <strong>Measurements kept clear</strong>
+            <span>Sizes, notes, and order details stay organized from the start.</span>
+          </div>
         </div>
         <div class="stat-pill">
-          <strong>Main branch storefront</strong>
-          <span>Visit the shop, discuss requirements, and get updates without guesswork.</span>
+          <span class="stat-icon"><i class="fas fa-list-check"></i></span>
+          <div>
+            <strong>Updates without guesswork</strong>
+            <span>Follow progress for uniforms, alterations, and custom pieces more easily.</span>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <div class="hero-floating fade-up" style="animation-delay: .12s">
-      <div class="floating-card hero-callout">
-        <span class="eyebrow">Sakuragi Tailoring</span>
-        <strong>Custom garments with clearer order tracking</strong>
-        <p>Ideal for customers ordering uniforms, alterations, repairs, and made-to-measure pieces.</p>
       </div>
     </div>
   </div>
