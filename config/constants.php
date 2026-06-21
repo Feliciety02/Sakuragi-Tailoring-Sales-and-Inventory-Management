@@ -2,9 +2,15 @@
 
 // Roles
 define('ROLE_ADMIN', 'admin');
+define('ROLE_CUSTOMER', 'customer');
+define('ROLE_OPERATIONS_MANAGER', 'operations_manager');
+define('ROLE_PRODUCTION_STAFF', 'production_staff');
+define('ROLE_INVENTORY_MANAGER', 'inventory_manager');
+define('ROLE_QUALITY_CONTROL_INSPECTOR', 'quality_control_inspector');
+
+// Legacy roles kept for backwards compatibility while data is migrated
 define('ROLE_MANAGER', 'manager');
 define('ROLE_EMPLOYEE', 'employee');
-define('ROLE_CUSTOMER', 'customer');
 
 // User Status
 define('STATUS_ACTIVE', 'Active');

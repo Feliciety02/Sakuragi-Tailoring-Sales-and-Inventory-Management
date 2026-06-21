@@ -13,7 +13,7 @@ function is_logged_in() {
 }
 
 function get_user_role() {
-    return $_SESSION['role'] ?? null;
+    return $_SESSION['role_context'] ?? $_SESSION['role'] ?? null;
 }
 
 function require_login() {
@@ -31,7 +31,21 @@ function redirect_if_logged_in() {
                 break;
             case 'manager':
             case 'employee':
-                header('Location: /dashboards/employee/dashboard.php');
+            case 'operations_manager':
+            case 'production_staff':
+            case 'inventory_manager':
+            case 'quality_control_inspector':
+                $target = '/dashboards/employee/dashboard.php';
+                $dbPath = __DIR__ . '/db_connect.php';
+                $helperPath = __DIR__ . '/../app/Support/helpers.php';
+                if (file_exists($dbPath) && file_exists($helperPath)) {
+                    require_once $dbPath;
+                    require_once $helperPath;
+                    if (isset($pdo) && function_exists('get_role_dashboard_home')) {
+                        $target = get_role_dashboard_home($pdo, get_user_role(), (int) ($_SESSION['user_id'] ?? 0));
+                    }
+                }
+                header('Location: ' . $target);
                 break;
             case 'customer':
             default:
