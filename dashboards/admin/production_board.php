@@ -4,22 +4,18 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once '../../app/Middleware/role_admin_only.php';
 
-
 $user_id = $_SESSION['user_id'];
 
-// Fetch employees for assign dropdown
 $empStmt = $pdo->prepare("SELECT u.user_id, u.full_name FROM users u JOIN employees e ON u.user_id = e.user_id WHERE u.status = 'Active' ORDER BY u.full_name");
 $empStmt->execute();
 $employees = $empStmt->fetchAll();
 
-// Stats
 $stats = [];
 $stats['total_active'] = $pdo->query("SELECT COUNT(*) FROM orders WHERE status NOT IN ('Completed','Cancelled','Refunded')")->fetchColumn();
-$stats['in_qc'] = $pdo->query("SELECT COUNT(*) FROM order_workflow WHERE stage = 'Quality Inspection'")->fetchColumn();
+$stats['in_qc'] = $pdo->query("SELECT COUNT(*) FROM order_workflow WHERE stage = 'QC'")->fetchColumn();
 $stats['overdue'] = $pdo->query("SELECT COUNT(*) FROM order_workflow ow JOIN orders o ON ow.order_id = o.order_id WHERE ow.expected_completion IS NOT NULL AND ow.expected_completion < NOW() AND o.status NOT IN ('Completed','Cancelled','Refunded')")->fetchColumn();
 $stats['completed_today'] = $pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(completion_date) = CURDATE() AND status = 'Completed'")->fetchColumn();
 
-// Most loaded employee
 $loaded = $pdo->query("SELECT u.full_name, COUNT(*) as cnt FROM order_workflow ow JOIN users u ON ow.assigned_employee = u.user_id JOIN orders o ON ow.order_id = o.order_id WHERE o.status NOT IN ('Completed','Cancelled','Refunded') GROUP BY ow.assigned_employee ORDER BY cnt DESC LIMIT 1")->fetch();
 $pageTitle = 'Production Board';
 ?>
@@ -46,6 +42,10 @@ $pageTitle = 'Production Board';
   .card-actions button { width: 24px; height: 24px; border: none; border-radius: 4px; background: #f3f4f6; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; color: #6b7280; }
   .card-actions button:hover { background: #e5e7eb; color: #1f2937; }
   .kanban-card .design-thumb { width: 100%; height: 60px; object-fit: cover; border-radius: 4px; margin-top: 8px; background: #f9fafb; }
+  .kanban-column.owner-operations .kanban-column-header { border-left: 3px solid #f59e0b; }
+  .kanban-column.owner-production .kanban-column-header { border-left: 3px solid #06b6d4; }
+  .kanban-column.owner-inventory .kanban-column-header { border-left: 3px solid #8b5cf6; }
+  .kanban-column.owner-qc .kanban-column-header { border-left: 3px solid #10b981; }
 </style>
 </head>
 <body>
@@ -65,7 +65,6 @@ $pageTitle = 'Production Board';
     </div>
   </div>
 
-  <!-- Stats row -->
   <div class="mes-stat-row">
     <div class="mes-stat"><div class="mes-stat-label">Active Orders</div><div class="mes-stat-value"><?= $stats['total_active'] ?></div></div>
     <div class="mes-stat"><div class="mes-stat-label">Waiting for QC</div><div class="mes-stat-value"><?= $stats['in_qc'] ?></div></div>
@@ -74,13 +73,36 @@ $pageTitle = 'Production Board';
     <div class="mes-stat"><div class="mes-stat-label">Busiest Employee</div><div class="mes-stat-value" style="font-size:16px;font-weight:600"><?= htmlspecialchars($loaded['full_name'] ?? 'N/A') ?></div></div>
   </div>
 
-  <!-- Kanban Board -->
   <div class="kanban-board" id="kanbanBoard">
-    <?php $stage_order = [STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_MATERIAL_PREP, STAGE_SAMPLE_REVIEW, STAGE_BULK_PRODUCTION, STAGE_CUTTING, STAGE_PRINTING, STAGE_SEWING, STAGE_QUALITY_INSPECTION, STAGE_REWORK, STAGE_PACKAGING, STAGE_READY_PICKUP];
+    <?php
+    $stage_order = [
+      STAGE_PENDING_VERIFICATION,
+      STAGE_CUSTOMER_ACTION,
+      STAGE_READY_FOR_PRODUCTION,
+      STAGE_WAITING_MATERIALS,
+      STAGE_MATERIALS_RESERVED,
+      STAGE_CUTTING,
+      STAGE_SEWING,
+      STAGE_EMBROIDERY,
+      STAGE_FINISHING,
+      STAGE_QC,
+      STAGE_REWORK,
+      STAGE_READY_FOR_RELEASE,
+      STAGE_AWAITING_PAYMENT,
+      STAGE_RELEASED,
+    ];
+    $role_class_map = [
+        ROLE_OPERATIONS_MANAGER => 'owner-operations',
+        ROLE_PRODUCTION_STAFF => 'owner-production',
+        ROLE_INVENTORY_MANAGER => 'owner-inventory',
+        ROLE_QUALITY_CONTROL_INSPECTOR => 'owner-qc',
+    ];
     foreach ($stage_order as $stg):
       $cfg = $STAGE_CONFIG[$stg] ?? ['label' => $stg, 'color' => '#6b7280', 'icon' => 'fas fa-circle'];
+      $owner = get_stage_owner_role($stg);
+      $ownerClass = $role_class_map[$owner] ?? '';
     ?>
-    <div class="kanban-column" data-stage="<?= htmlspecialchars($stg) ?>">
+    <div class="kanban-column <?= $ownerClass ?>" data-stage="<?= htmlspecialchars($stg) ?>">
       <div class="kanban-column-header">
         <div class="kanban-column-title">
           <i class="<?= $cfg['icon'] ?>" style="color:<?= $cfg['color'] ?>"></i>
@@ -96,7 +118,6 @@ $pageTitle = 'Production Board';
   </div>
 </div>
 
-<!-- Assign Employee Modal -->
 <div id="assignModal" class="mes-modal-overlay" style="display:none" onclick="if(event.target===this)closeAssign()">
   <div class="mes-modal">
     <div class="mes-modal-header">
@@ -137,7 +158,6 @@ function loadBoard() {
 }
 
 function renderBoard() {
-  // Group by stage
   const grouped = {};
   STAGES.forEach(s => grouped[s] = []);
   allOrders.forEach(o => {
@@ -170,7 +190,6 @@ function renderCard(o) {
   const priority = o.priority || 'medium';
   const thumb = o.design_preview ? '<img src="/public/' + o.design_preview + '" class="design-thumb">' : '';
 
-  // Batch quantity progress: get quantity at this card's stage vs total
   const stageQty = o.stage_quantities || {};
   const sq = stageQty[o.stage] || 0;
   const totalQty = o.total_quantity || 0;
@@ -183,6 +202,10 @@ function renderCard(o) {
     <div class="progress-bar" style="height:4px;background:#e5e7eb"><div class="progress-fill" style="width:${qtyPct}%;background:#059669"></div></div>
   </div>` : '';
 
+  const paymentBadge = o.payment_status === 'Pending' && o.stage === 'Awaiting Final Payment'
+    ? '<span style="background:#fef3c7;color:#92400e;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px">Unpaid</span>'
+    : '';
+
   return `<div class="kanban-card" draggable="true" ondragstart="drag(event, ${o.order_id})" data-id="${o.order_id}">
     <div class="card-actions">
       <button onclick="openAssign(${o.order_id})" title="Assign"><i class="fas fa-user-plus"></i></button>
@@ -193,7 +216,7 @@ function renderCard(o) {
     <div class="meta-row">
       <span class="priority-badge priority-${priority}">${priority}</span>
       <span><i class="far fa-calendar-alt"></i> ${o.expected_completion ? o.expected_completion.slice(0,10) : '—'}</span>
-      <span>Qty: ${totalQty}</span>
+      <span>Qty: ${totalQty} ${paymentBadge}</span>
     </div>
     <div class="meta-row">
       <span class="assignee"><span class="avatar-sm">${initials}</span> ${escapeHtml(empName)}</span>
@@ -273,6 +296,7 @@ setInterval(loadBoard, 30000);
 </script>
 
   </div>
+</div>
 </div>
 
 <script>

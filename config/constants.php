@@ -1,6 +1,6 @@
 <?php
 
-// Roles
+// ── Roles ──
 define('ROLE_ADMIN', 'admin');
 define('ROLE_CUSTOMER', 'customer');
 define('ROLE_OPERATIONS_MANAGER', 'operations_manager');
@@ -12,127 +12,245 @@ define('ROLE_QUALITY_CONTROL_INSPECTOR', 'quality_control_inspector');
 define('ROLE_MANAGER', 'manager');
 define('ROLE_EMPLOYEE', 'employee');
 
-// User Status
+// ── User Status ──
 define('STATUS_ACTIVE', 'Active');
 define('STATUS_INACTIVE', 'Inactive');
 define('STATUS_SUSPENDED', 'Suspended');
 
-// Order Status
+// ── Order Status ──
 define('ORDER_PENDING', 'Pending');
 define('ORDER_IN_PROGRESS', 'In Progress');
 define('ORDER_COMPLETED', 'Completed');
 define('ORDER_CANCELLED', 'Cancelled');
 define('ORDER_REFUNDED', 'Refunded');
 
-// Payment Status
+// ── Payment Status ──
 define('PAYMENT_PENDING', 'Pending');
 define('PAYMENT_PAID', 'Paid');
 define('PAYMENT_REFUNDED', 'Refunded');
 
-// Production Workflow Stages (MES)
-define('STAGE_ORDER_RECEIVED', 'Order Received');
-define('STAGE_DESIGN_REVIEW', 'Design Review');
-define('STAGE_MATERIAL_PREP', 'Material Preparation');
-define('STAGE_CUTTING', 'Cutting');
-define('STAGE_PRINTING', 'Printing / Embroidery');
-define('STAGE_SEWING', 'Sewing & Assembly');
-define('STAGE_SAMPLE_REVIEW', 'Sample Review');
-define('STAGE_BULK_PRODUCTION', 'Bulk Production');
-define('STAGE_QUALITY_INSPECTION', 'Quality Inspection');
-define('STAGE_REWORK', 'Rework');
-define('STAGE_PACKAGING', 'Packaging');
-define('STAGE_READY_PICKUP', 'Ready for Pickup');
-define('STAGE_COMPLETED', 'Completed');
+// ── Production Workflow Stages (New Lifecycle) ──
+// Admin        → any stage (override)
+// Ops Manager  → Pending Verification, Customer Action Required, Ready for Production, Ready for Release
+// Customer     → Customer Action Required (resubmit)
+// Inventory    → Waiting for Materials, Materials Reserved
+// Production   → Cutting, Sewing, Embroidery, Finishing, Rework
+// QC Inspector → QC
 
-// Customer-facing simplified stages
-define('CSTAGE_CONFIRMED', 'Order Confirmed');
-define('CSTAGE_PRODUCTION', 'In Production');
-define('CSTAGE_QUALITY', 'Quality Check');
-define('CSTAGE_PACKAGING_C', 'Packaging');
-define('CSTAGE_READY', 'Ready for Pickup');
-define('CSTAGE_DONE', 'Completed');
+define('STAGE_PENDING_VERIFICATION',  'Pending Verification');
+define('STAGE_CUSTOMER_ACTION',       'Customer Action Required');
+define('STAGE_READY_FOR_PRODUCTION',  'Ready for Production');
+define('STAGE_WAITING_MATERIALS',     'Waiting for Materials');
+define('STAGE_MATERIALS_RESERVED',    'Materials Reserved');
+define('STAGE_CUTTING',               'Cutting');
+define('STAGE_SEWING',                'Sewing');
+define('STAGE_EMBROIDERY',            'Embroidery');
+define('STAGE_FINISHING',             'Finishing');
+define('STAGE_QC',                    'QC');
+define('STAGE_REWORK',                'Rework');
+define('STAGE_READY_FOR_RELEASE',     'Ready for Release');
+define('STAGE_AWAITING_PAYMENT',      'Awaiting Final Payment');
+define('STAGE_RELEASED',              'Released');
 
-// Stage display labels and colors for the kanban board
+// Legacy stage aliases (still referenced in old data/view files)
+define('STAGE_ORDER_RECEIVED',       STAGE_PENDING_VERIFICATION);
+define('STAGE_DESIGN_REVIEW',        STAGE_READY_FOR_PRODUCTION);
+define('STAGE_MATERIAL_PREP',        STAGE_WAITING_MATERIALS);
+define('STAGE_SAMPLE_REVIEW',        STAGE_READY_FOR_PRODUCTION);
+define('STAGE_BULK_PRODUCTION',      STAGE_FINISHING);
+define('STAGE_QUALITY_INSPECTION',   STAGE_QC);
+define('STAGE_PRINTING',             STAGE_EMBROIDERY);
+define('STAGE_PACKAGING',            STAGE_READY_FOR_RELEASE);
+define('STAGE_READY_PICKUP',         STAGE_READY_FOR_RELEASE);
+define('STAGE_COMPLETED',            STAGE_RELEASED);
+
+// ── Customer-facing simplified stages ──
+define('CSTAGE_CONFIRMED',    'Order Confirmed');
+define('CSTAGE_PRODUCTION',   'In Production');
+define('CSTAGE_QUALITY',      'Quality Check');
+define('CSTAGE_PACKAGING_C',  'Packaging');
+define('CSTAGE_READY',        'Ready for Pickup');
+define('CSTAGE_DONE',         'Completed');
+
+// ── All stages in flow order ──
+$ORDER_STAGES = [
+    STAGE_PENDING_VERIFICATION,
+    STAGE_CUSTOMER_ACTION,
+    STAGE_READY_FOR_PRODUCTION,
+    STAGE_WAITING_MATERIALS,
+    STAGE_MATERIALS_RESERVED,
+    STAGE_CUTTING,
+    STAGE_SEWING,
+    STAGE_EMBROIDERY,
+    STAGE_FINISHING,
+    STAGE_QC,
+    STAGE_REWORK,
+    STAGE_READY_FOR_RELEASE,
+    STAGE_AWAITING_PAYMENT,
+    STAGE_RELEASED,
+];
+
+// ── Stage display config for kanban ──
 $STAGE_CONFIG = [
-    'Order Received'       => ['label' => 'Order Received',      'color' => '#f59e0b', 'icon' => 'fas fa-inbox'],
-    'Design Review'        => ['label' => 'Design Review',       'color' => '#8b5cf6', 'icon' => 'fas fa-pencil-ruler'],
-    'Material Preparation' => ['label' => 'Material Prep',       'color' => '#3b82f6', 'icon' => 'fas fa-roll'],
-    'Sample Review'        => ['label' => 'Sample Review',       'color' => '#7c3aed', 'icon' => 'fas fa-flask'],
-    'Bulk Production'      => ['label' => 'Bulk Production',     'color' => '#2563eb', 'icon' => 'fas fa-industry'],
-    'Cutting'              => ['label' => 'Cutting',             'color' => '#06b6d4', 'icon' => 'fas fa-cut'],
-    'Printing / Embroidery'=> ['label' => 'Print / Embroider',   'color' => '#ec4899', 'icon' => 'fas fa-print'],
-    'Sewing & Assembly'    => ['label' => 'Sewing & Assembly',   'color' => '#f97316', 'icon' => 'fas fa-tshirt'],
-    'Quality Inspection'   => ['label' => 'Quality Inspection',  'color' => '#10b981', 'icon' => 'fas fa-search'],
-    'Rework'               => ['label' => 'Rework',              'color' => '#ef4444', 'icon' => 'fas fa-undo-alt'],
-    'Packaging'            => ['label' => 'Packaging',           'color' => '#6366f1', 'icon' => 'fas fa-box'],
-    'Ready for Pickup'     => ['label' => 'Ready for Pickup',    'color' => '#14b8a6', 'icon' => 'fas fa-check-circle'],
-    'Completed'            => ['label' => 'Completed',           'color' => '#10b981', 'icon' => 'fas fa-check-double'],
+    STAGE_PENDING_VERIFICATION => ['label' => 'Pending Verification',  'color' => '#f59e0b', 'icon' => 'fas fa-inbox'],
+    STAGE_CUSTOMER_ACTION      => ['label' => 'Customer Action',       'color' => '#f97316', 'icon' => 'fas fa-user-edit'],
+    STAGE_READY_FOR_PRODUCTION => ['label' => 'Ready for Production',  'color' => '#3b82f6', 'icon' => 'fas fa-check-double'],
+    STAGE_WAITING_MATERIALS    => ['label' => 'Waiting for Materials', 'color' => '#8b5cf6', 'icon' => 'fas fa-hourglass-half'],
+    STAGE_MATERIALS_RESERVED   => ['label' => 'Materials Reserved',    'color' => '#06b6d4', 'icon' => 'fas fa-warehouse'],
+    STAGE_CUTTING              => ['label' => 'Cutting',               'color' => '#06b6d4', 'icon' => 'fas fa-cut'],
+    STAGE_SEWING               => ['label' => 'Sewing',                'color' => '#f97316', 'icon' => 'fas fa-tshirt'],
+    STAGE_EMBROIDERY           => ['label' => 'Embroidery',            'color' => '#ec4899', 'icon' => 'fas fa-print'],
+    STAGE_FINISHING            => ['label' => 'Finishing',             'color' => '#14b8a6', 'icon' => 'fas fa-iron'],
+    STAGE_QC                   => ['label' => 'QC',                    'color' => '#10b981', 'icon' => 'fas fa-search'],
+    STAGE_REWORK               => ['label' => 'Rework',                'color' => '#ef4444', 'icon' => 'fas fa-undo-alt'],
+    STAGE_READY_FOR_RELEASE    => ['label' => 'Ready for Release',     'color' => '#6366f1', 'icon' => 'fas fa-check-circle'],
+    STAGE_AWAITING_PAYMENT     => ['label' => 'Awaiting Payment',      'color' => '#7c3aed', 'icon' => 'fas fa-credit-card'],
+    STAGE_RELEASED             => ['label' => 'Released',              'color' => '#10b981', 'icon' => 'fas fa-check-double'],
 ];
 
-// Customer stage mapping (internal stage → customer-facing stage)
+// ── Stage ownership (which roles can advance FROM each stage) ──
+// Each entry lists roles allowed to move an order forward from that stage.
+// Admin is always allowed implicitly.
+$STAGE_OWNERSHIP = [
+    STAGE_PENDING_VERIFICATION => [ROLE_OPERATIONS_MANAGER],
+    STAGE_CUSTOMER_ACTION      => [ROLE_OPERATIONS_MANAGER, ROLE_CUSTOMER],
+    STAGE_READY_FOR_PRODUCTION => [ROLE_OPERATIONS_MANAGER, ROLE_INVENTORY_MANAGER],
+    STAGE_WAITING_MATERIALS    => [ROLE_INVENTORY_MANAGER],
+    STAGE_MATERIALS_RESERVED   => [ROLE_INVENTORY_MANAGER, ROLE_OPERATIONS_MANAGER],
+    STAGE_CUTTING              => [ROLE_PRODUCTION_STAFF],
+    STAGE_SEWING               => [ROLE_PRODUCTION_STAFF],
+    STAGE_EMBROIDERY           => [ROLE_PRODUCTION_STAFF],
+    STAGE_FINISHING            => [ROLE_PRODUCTION_STAFF],
+    STAGE_QC                   => [ROLE_QUALITY_CONTROL_INSPECTOR],
+    STAGE_REWORK               => [ROLE_PRODUCTION_STAFF],
+    STAGE_READY_FOR_RELEASE    => [ROLE_OPERATIONS_MANAGER],
+    STAGE_AWAITING_PAYMENT     => [ROLE_CUSTOMER, ROLE_ADMIN],
+    STAGE_RELEASED             => [],
+];
+
+// ── Valid transitions per stage ──
+$STAGE_TRANSITIONS = [
+    STAGE_PENDING_VERIFICATION => [STAGE_CUSTOMER_ACTION, STAGE_READY_FOR_PRODUCTION],
+    STAGE_CUSTOMER_ACTION      => [STAGE_READY_FOR_PRODUCTION],
+    STAGE_READY_FOR_PRODUCTION => [STAGE_WAITING_MATERIALS, STAGE_MATERIALS_RESERVED],
+    STAGE_WAITING_MATERIALS    => [STAGE_MATERIALS_RESERVED],
+    STAGE_MATERIALS_RESERVED   => [STAGE_CUTTING],
+    STAGE_CUTTING              => [STAGE_SEWING],
+    STAGE_SEWING               => [STAGE_EMBROIDERY],
+    STAGE_EMBROIDERY           => [STAGE_FINISHING],
+    STAGE_FINISHING            => [STAGE_QC],
+    STAGE_QC                   => [STAGE_REWORK, STAGE_READY_FOR_RELEASE],
+    STAGE_REWORK               => [STAGE_QC],
+    STAGE_READY_FOR_RELEASE    => [STAGE_AWAITING_PAYMENT, STAGE_RELEASED],
+    STAGE_AWAITING_PAYMENT     => [STAGE_RELEASED],
+    STAGE_RELEASED             => [],
+];
+
+// ── Customer stage mapping (internal → customer-facing) ──
 $CUSTOMER_STAGE_MAP = [
-    'Order Received'       => 'Order Confirmed',
-    'Design Review'        => 'In Production',
-    'Material Preparation' => 'In Production',
-    'Sample Review'        => 'Sample Review',
-    'Bulk Production'      => 'In Production',
-    'Cutting'              => 'In Production',
-    'Printing / Embroidery'=> 'In Production',
-    'Sewing & Assembly'    => 'In Production',
-    'Quality Inspection'   => 'Quality Check',
-    'Rework'               => 'In Production',
-    'Packaging'            => 'Packaging',
-    'Ready for Pickup'     => 'Ready for Pickup',
-    'Completed'            => 'Completed',
+    STAGE_PENDING_VERIFICATION => 'Order Confirmed',
+    STAGE_CUSTOMER_ACTION      => 'Action Needed',
+    STAGE_READY_FOR_PRODUCTION => 'In Production',
+    STAGE_WAITING_MATERIALS    => 'In Production',
+    STAGE_MATERIALS_RESERVED   => 'In Production',
+    STAGE_CUTTING              => 'In Production',
+    STAGE_SEWING               => 'In Production',
+    STAGE_EMBROIDERY           => 'In Production',
+    STAGE_FINISHING            => 'In Production',
+    STAGE_QC                   => 'Quality Check',
+    STAGE_REWORK               => 'In Production',
+    STAGE_READY_FOR_RELEASE    => 'Ready for Release',
+    STAGE_AWAITING_PAYMENT     => 'Awaiting Payment',
+    STAGE_RELEASED             => 'Completed',
 ];
 
-// Position → stage mapping (which stages each position can work on)
-$POSITION_STAGES = [
-    1 => [STAGE_CUTTING, STAGE_SEWING],                               // Tailor
-    2 => [STAGE_SEWING],                                               // Senior Tailor
-    3 => [STAGE_SEWING],                                               // Alteration Specialist
-    4 => [STAGE_DESIGN_REVIEW, STAGE_CUTTING],                        // Pattern Maker
-    5 => [STAGE_PRINTING],                                             // Sublimation Technician
-    6 => [STAGE_PRINTING],                                             // Screen Printing Operator
-    7 => [STAGE_PRINTING],                                             // Print Finisher
-    8 => [STAGE_PRINTING],                                             // Embroidery Machine Operator
-    9 => [STAGE_PRINTING],                                             // Embroidery Technician
-    10 => [STAGE_QUALITY_INSPECTION, STAGE_REWORK],                   // Quality Control Inspector
-    11 => [STAGE_PACKAGING, STAGE_READY_PICKUP],                      // Packing Staff
-    12 => [STAGE_MATERIAL_PREP, STAGE_CUTTING, STAGE_SEWING],         // Production Staff
-    13 => [STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_MATERIAL_PREP, STAGE_CUTTING, STAGE_PRINTING, STAGE_SEWING, STAGE_QUALITY_INSPECTION, STAGE_REWORK, STAGE_PACKAGING, STAGE_READY_PICKUP], // Floor Supervisor
-    14 => [STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_PACKAGING, STAGE_READY_PICKUP], // Shop Assistant
-];
+// ── Stage progress percentages ──
+function getStageProgress($stage)
+{
+    $map = [
+        STAGE_PENDING_VERIFICATION => 5,
+        STAGE_CUSTOMER_ACTION      => 10,
+        STAGE_READY_FOR_PRODUCTION => 15,
+        STAGE_WAITING_MATERIALS    => 20,
+        STAGE_MATERIALS_RESERVED   => 25,
+        STAGE_CUTTING              => 40,
+        STAGE_SEWING               => 55,
+        STAGE_EMBROIDERY           => 65,
+        STAGE_FINISHING            => 75,
+        STAGE_QC                   => 85,
+        STAGE_REWORK               => 50,
+        STAGE_READY_FOR_RELEASE    => 92,
+        STAGE_AWAITING_PAYMENT     => 95,
+        STAGE_RELEASED             => 100,
+    ];
+    return $map[$stage] ?? 0;
+}
 
+// ── Permission helpers ──
+
+/**
+ * Check if a role is allowed to move an order from a given stage.
+ * Admin is always allowed.
+ */
+function can_transition_stage(string $role, string $currentStage): bool {
+    if ($role === ROLE_ADMIN) return true;
+    global $STAGE_OWNERSHIP;
+    $owners = $STAGE_OWNERSHIP[$currentStage] ?? [];
+    return in_array($role, $owners, true);
+}
+
+/**
+ * Get valid next stages for a role from a given stage.
+ */
+function get_valid_transitions(string $role, string $currentStage): array {
+    if ($role === ROLE_ADMIN) {
+        global $STAGE_TRANSITIONS;
+        return $STAGE_TRANSITIONS[$currentStage] ?? [];
+    }
+    if (!can_transition_stage($role, $currentStage)) return [];
+    global $STAGE_TRANSITIONS;
+    return $STAGE_TRANSITIONS[$currentStage] ?? [];
+}
+
+/**
+ * Get which role is supposed to handle a stage (for UI hints).
+ */
+function get_stage_owner_role(string $stage): string {
+    global $STAGE_OWNERSHIP;
+    $owners = $STAGE_OWNERSHIP[$stage] ?? [];
+    return $owners[0] ?? ROLE_ADMIN;
+}
+
+/**
+ * Get stages a given role is allowed to transition.
+ */
+function get_role_allowed_stages(string $role): array {
+    if ($role === ROLE_ADMIN) {
+        global $ORDER_STAGES;
+        return $ORDER_STAGES;
+    }
+    global $STAGE_OWNERSHIP;
+    $stages = [];
+    foreach ($STAGE_OWNERSHIP as $stage => $owners) {
+        if (in_array($role, $owners, true)) {
+            $stages[] = $stage;
+        }
+    }
+    return $stages;
+}
+
+// ── Backwards compatibility shims for old position-based helpers ──
 function getPositionStages($position_id) {
-    global $POSITION_STAGES;
-    return $POSITION_STAGES[(int)$position_id] ?? [STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_MATERIAL_PREP, STAGE_CUTTING, STAGE_PRINTING, STAGE_SEWING, STAGE_QUALITY_INSPECTION, STAGE_REWORK, STAGE_PACKAGING, STAGE_READY_PICKUP];
+    global $ORDER_STAGES;
+    return $ORDER_STAGES;
 }
 
 function getEmployeePosition($pdo, $user_id) {
     $stmt = $pdo->prepare("SELECT e.position_id, p.position_name FROM employees e JOIN positions p ON e.position_id = p.position_id WHERE e.user_id = ?");
     $stmt->execute([$user_id]);
-    return $stmt->fetch();
-}
-
-function getStageProgress($stage)
-{
-    $map = [
-        STAGE_ORDER_RECEIVED => 5,
-        STAGE_DESIGN_REVIEW => 15,
-        STAGE_MATERIAL_PREP => 25,
-        STAGE_SAMPLE_REVIEW => 35,
-        STAGE_BULK_PRODUCTION => 40,
-        STAGE_CUTTING => 45,
-        STAGE_PRINTING => 55,
-        STAGE_SEWING => 65,
-        STAGE_QUALITY_INSPECTION => 80,
-        STAGE_REWORK => 50,
-        STAGE_PACKAGING => 90,
-        STAGE_READY_PICKUP => 95,
-        STAGE_COMPLETED => 100,
-    ];
-    return $map[$stage] ?? 0;
+    $res = $stmt->fetch();
+    if (!$res) return ['position_id' => 0, 'position_name' => ''];
+    return $res;
 }
 
 // AQL Sampling Levels

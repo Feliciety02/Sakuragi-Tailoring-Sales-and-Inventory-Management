@@ -19,11 +19,9 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $notif = new NotificationController($pdo);
 
 function logGarmentTransition($pdo, $order_id, $from_stage, $to_stage, $employee_id, $notes = '') {
-    // Update or insert garment_tracking for each order_detail
     $details = $pdo->prepare("SELECT detail_id FROM order_details WHERE order_id = ?");
     $details->execute([$order_id]);
     while ($d = $details->fetch()) {
-        // Upsert current stage
         $chk = $pdo->prepare("SELECT track_id FROM garment_tracking WHERE order_detail_id = ?");
         $chk->execute([$d['detail_id']]);
         if ($existing = $chk->fetch()) {
@@ -33,109 +31,107 @@ function logGarmentTransition($pdo, $order_id, $from_stage, $to_stage, $employee
             $pdo->prepare("INSERT INTO garment_tracking (order_detail_id, order_id, stage, employee_id, notes) VALUES (?, ?, ?, ?, ?)")
                 ->execute([$d['detail_id'], $order_id, $to_stage, $employee_id, $notes]);
         }
-        // Log history
         $pdo->prepare("INSERT INTO garment_log (order_detail_id, order_id, from_stage, to_stage, employee_id, notes) VALUES (?, ?, ?, ?, ?, ?)")
             ->execute([$d['detail_id'], $order_id, $from_stage, $to_stage, $employee_id, $notes]);
     }
 }
 
+function getWorkflowOrThrow($pdo, $order_id) {
+    $stmt = $pdo->prepare("SELECT ow.*, o.status as order_status, o.payment_status FROM order_workflow ow JOIN orders o ON ow.order_id = o.order_id WHERE ow.order_id = ?");
+    $stmt->execute([$order_id]);
+    $row = $stmt->fetch();
+    if (!$row) throw new Exception('Order not found in workflow');
+    return $row;
+}
+
 try {
     switch ($action) {
 
-        // ── Kanban: move order to new stage ──
+        // ── Stage transition (role-gated) ──
         case 'move_stage':
-            if ($role !== ROLE_ADMIN) {
-                throw new Exception('Only admins can move stages');
-            }
             $order_id = (int)($_POST['order_id'] ?? 0);
             $new_stage = $_POST['stage'] ?? '';
-            $valid_stages = [
-                STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW, STAGE_MATERIAL_PREP,
-                STAGE_CUTTING, STAGE_PRINTING, STAGE_SEWING,
-                STAGE_QUALITY_INSPECTION, STAGE_REWORK, STAGE_PACKAGING,
-                STAGE_READY_PICKUP, STAGE_COMPLETED,
-            ];
-            if (!$order_id || !in_array($new_stage, $valid_stages)) {
-                throw new Exception('Invalid parameters');
+            if (!$order_id || !$new_stage) throw new Exception('Invalid parameters');
+
+            $wf = getWorkflowOrThrow($pdo, $order_id);
+            $from_stage = $wf['stage'];
+
+            // Permission check
+            if ($role !== ROLE_ADMIN && !can_transition_stage($role, $from_stage)) {
+                throw new Exception('Your role cannot advance orders from this stage');
             }
 
-            // Validate assigned employee can work on target stage
-            $assigned = $pdo->prepare("SELECT assigned_employee, stage FROM order_workflow WHERE order_id = ?");
-            $assigned->execute([$order_id]);
-            $wf = $assigned->fetch();
-            if ($wf && $wf['assigned_employee']) {
-                $empPos = $pdo->prepare("SELECT position_id FROM employees WHERE user_id = ?");
-                $empPos->execute([$wf['assigned_employee']]);
-                $posId = $empPos->fetchColumn();
-                if ($posId) {
-                    $allowed = getPositionStages($posId);
-                    if (!in_array($new_stage, $allowed) && !in_array($new_stage, [STAGE_COMPLETED, STAGE_READY_PICKUP])) {
-                        throw new Exception("Assigned employee's position does not allow stage: $new_stage");
-                    }
-                }
+            // Check valid transition
+            $valid_next = get_valid_transitions($role, $from_stage);
+            if (!in_array($new_stage, $valid_next, true)) {
+                throw new Exception("Cannot transition from '$from_stage' to '$new_stage'");
             }
 
             $pdo->beginTransaction();
 
-            $from_stage = $wf['stage'] ?: 'Unknown';
+            $pdo->prepare("UPDATE order_workflow SET stage = ?, started_at = COALESCE(started_at, NOW()) WHERE order_id = ?")
+                ->execute([$new_stage, $order_id]);
 
-            // Update order workflow stage
-            $stmt = $pdo->prepare("UPDATE order_workflow SET stage = ?, completed_at = IF(? IN ('Completed','Ready for Pickup','Quality Inspection'), NOW(), NULL) WHERE order_id = ?");
-            $stmt->execute([$new_stage, $new_stage, $order_id]);
-
-            // If moved to Completed, also update order status
-            if ($new_stage === STAGE_COMPLETED) {
-                $pdo->prepare("UPDATE orders SET status = 'Completed', completion_date = NOW() WHERE order_id = ?")->execute([$order_id]);
-            }
-
-            // If moved to Rework, log it
+            // Stage-specific side effects
             if ($new_stage === STAGE_REWORK) {
-                $prev = $_POST['from_stage'] ?? $from_stage;
-                $reason = $_POST['reason'] ?? '';
-                $pdo->prepare("INSERT INTO rework_log (order_id, from_stage, to_stage, reason, triggered_by, created_at) VALUES (?, ?, 'Rework', ?, ?, NOW())")
-                    ->execute([$order_id, $prev, $reason, $user_id]);
+                $reason = $_POST['reason'] ?? 'Moved to rework';
+                $ncr_id = !empty($_POST['ncr_id']) ? (int)$_POST['ncr_id'] : null;
+                $pdo->prepare("INSERT INTO rework_log (order_id, from_stage, to_stage, reason, triggered_by, ncr_id, created_at) VALUES (?, ?, 'Rework', ?, ?, ?, NOW())")
+                    ->execute([$order_id, $from_stage, $reason, $user_id, $ncr_id]);
             }
 
-            // Log garment tracking
-            logGarmentTransition($pdo, $order_id, $from_stage, $new_stage, $user_id, $_POST['reason'] ?? '');
+            if ($new_stage === STAGE_READY_FOR_RELEASE && $role === ROLE_QUALITY_CONTROL_INSPECTOR) {
+                $pdo->prepare("UPDATE order_workflow SET completed_at = NOW() WHERE order_id = ?")->execute([$order_id]);
+            }
+
+            if ($new_stage === STAGE_RELEASED) {
+                $pdo->prepare("UPDATE orders SET status = 'Completed', completion_date = NOW(), released_at = NOW(), released_by = ? WHERE order_id = ?")
+                    ->execute([$user_id, $order_id]);
+            }
+
+            if (in_array($new_stage, [STAGE_WAITING_MATERIALS], true)) {
+                $pdo->prepare("UPDATE orders SET status = 'In Progress' WHERE order_id = ? AND status = 'Pending'")->execute([$order_id]);
+            }
+
+            logGarmentTransition($pdo, $order_id, $from_stage, $new_stage, $user_id, $_POST['notes'] ?? '');
+
+            // Save note if provided
+            if (!empty($_POST['notes'])) {
+                $pdo->prepare("INSERT INTO production_notes (order_id, author_id, content, note_type) VALUES (?, ?, ?, 'general')")
+                    ->execute([$order_id, $user_id, $_POST['notes']]);
+            }
 
             $pdo->commit();
 
-            // Notify the assigned employee
-            $empStmt = $pdo->prepare("SELECT assigned_employee FROM order_workflow WHERE order_id = ?");
-            $empStmt->execute([$order_id]);
-            $assigned = $empStmt->fetchColumn();
-            if ($assigned) {
-                $notif->create($assigned, "Order #ORD-{$order_id} moved to stage: {$new_stage}.");
+            // Notifications
+            $notif->create($wf['assigned_employee'] ?: $user_id, "Order #ORD-{$order_id} moved to: {$new_stage}.");
+            $ownerStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
+            $ownerStmt->execute([$order_id]);
+            $owner = $ownerStmt->fetchColumn();
+            if ($owner) {
+                $notif->create($owner, "Your order #ORD-{$order_id} status updated to: {$new_stage}.");
+            }
+
+            // Notify inventory manager if materials needed
+            if ($new_stage === STAGE_WAITING_MATERIALS) {
+                $invMgrs = $pdo->prepare("SELECT user_id FROM users WHERE role = 'inventory_manager' AND status = 'Active'");
+                $invMgrs->execute();
+                foreach ($invMgrs->fetchAll(PDO::FETCH_COLUMN) as $imId) {
+                    $notif->create($imId, "Order #ORD-{$order_id} needs material allocation.");
+                }
             }
 
             echo json_encode(['success' => true, 'stage' => $new_stage]);
             break;
 
-        // ── Assign employee to order ──
+        // ── Assign employee ──
         case 'assign_employee':
-            if ($role !== ROLE_ADMIN) {
-                throw new Exception('Only admins can assign employees');
+            if (!in_array($role, [ROLE_ADMIN, ROLE_OPERATIONS_MANAGER], true)) {
+                throw new Exception('Only admin or operations manager can assign employees');
             }
             $order_id = (int)($_POST['order_id'] ?? 0);
             $employee_id = (int)($_POST['employee_id'] ?? 0);
             if (!$order_id) throw new Exception('Invalid order');
-
-            // Validate employee position matches current stage
-            if ($employee_id) {
-                $cur = $pdo->prepare("SELECT stage FROM order_workflow WHERE order_id = ?");
-                $cur->execute([$order_id]);
-                $curStage = $cur->fetchColumn();
-                $empPos = $pdo->prepare("SELECT position_id FROM employees WHERE user_id = ?");
-                $empPos->execute([$employee_id]);
-                $posId = $empPos->fetchColumn();
-                if ($posId && $curStage) {
-                    $allowed = getPositionStages($posId);
-                    if (!in_array($curStage, $allowed) && !in_array($curStage, [STAGE_COMPLETED, STAGE_READY_PICKUP, STAGE_QUALITY_INSPECTION])) {
-                        throw new Exception("Employee position does not allow current stage: $curStage");
-                    }
-                }
-            }
 
             $pdo->prepare("UPDATE order_workflow SET assigned_employee = ? WHERE order_id = ?")->execute([$employee_id ?: null, $order_id]);
             $pdo->prepare("UPDATE orders SET employee_id = ? WHERE order_id = ?")->execute([$employee_id ?: null, $order_id]);
@@ -148,7 +144,7 @@ try {
 
         // ── Update priority ──
         case 'set_priority':
-            if ($role !== ROLE_ADMIN) throw new Exception('Unauthorized');
+            if (!in_array($role, [ROLE_ADMIN, ROLE_OPERATIONS_MANAGER], true)) throw new Exception('Unauthorized');
             $order_id = (int)($_POST['order_id'] ?? 0);
             $priority = $_POST['priority'] ?? '';
             if (!in_array($priority, ['low','medium','high','urgent'])) throw new Exception('Invalid priority');
@@ -156,72 +152,40 @@ try {
             echo json_encode(['success' => true]);
             break;
 
-        // ── Employee: start / pause / update stage ──
-        case 'employee_update_stage':
+        // ── Employee start work (from their assigned task) ──
+        case 'employee_start':
             $order_id = (int)($_POST['order_id'] ?? 0);
-            $new_stage = $_POST['stage'] ?? '';
-            $notes = $_POST['notes'] ?? '';
-
-            // Verify ownership
             $check = $pdo->prepare("SELECT assigned_employee, stage FROM order_workflow WHERE order_id = ?");
             $check->execute([$order_id]);
             $row = $check->fetch();
             if (!$row || $row['assigned_employee'] != $user_id) throw new Exception('Not your task');
-            $from_stage = $row['stage'];
 
-            $pdo->beginTransaction();
-
-            $pdo->prepare("UPDATE order_workflow SET stage = ?, workflow_notes = ?, started_at = COALESCE(started_at, NOW()) WHERE order_id = ?")
-                ->execute([$new_stage, $notes, $order_id]);
-
-            // Also update order status
-            if ($new_stage === STAGE_QUALITY_INSPECTION) {
-                $pdo->prepare("UPDATE orders SET status = 'In Progress' WHERE order_id = ?")->execute([$order_id]);
-            }
-
-            // Log garment tracking
-            logGarmentTransition($pdo, $order_id, $from_stage, $new_stage, $user_id, $notes);
-
-            // Save note
-            if ($notes) {
-                $pdo->prepare("INSERT INTO production_notes (order_id, author_id, content, note_type) VALUES (?, ?, ?, 'general')")
-                    ->execute([$order_id, $user_id, $notes]);
-            }
-
-            $pdo->commit();
-
-            // Notify customer
-            $ownerStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
-            $ownerStmt->execute([$order_id]);
-            $owner = $ownerStmt->fetchColumn();
-            if ($owner) {
-                $notif->create($owner, "Your order #ORD-{$order_id} stage updated to: {$new_stage}.");
-            }
-
-            echo json_encode(['success' => true, 'stage' => $new_stage]);
+            $pdo->prepare("UPDATE order_workflow SET started_at = NOW() WHERE order_id = ?")->execute([$order_id]);
+            echo json_encode(['success' => true]);
             break;
 
-        // ── QC Submission (employee finishes → QC) ──
+        // ── QC submit (production staff finishes → QC) ──
         case 'submit_for_qc':
             $order_id = (int)($_POST['order_id'] ?? 0);
             $notes = $_POST['notes'] ?? '';
 
-            $check = $pdo->prepare("SELECT assigned_employee, stage FROM order_workflow WHERE order_id = ?");
-            $check->execute([$order_id]);
-            $row = $check->fetch();
-            if (!$row || $row['assigned_employee'] != $user_id) throw new Exception('Not your task');
-            $from_stage = $row['stage'];
+            $wf = getWorkflowOrThrow($pdo, $order_id);
+            if ($wf['stage'] !== STAGE_FINISHING) throw new Exception('Order must be in Finishing stage to submit for QC');
+
+            if ($role === ROLE_PRODUCTION_STAFF && $wf['assigned_employee'] != $user_id) {
+                throw new Exception('Not your task');
+            }
+            if (!in_array($role, [ROLE_PRODUCTION_STAFF, ROLE_ADMIN, ROLE_OPERATIONS_MANAGER], true)) {
+                throw new Exception('Not authorized to submit for QC');
+            }
 
             $pdo->beginTransaction();
             $pdo->prepare("UPDATE order_workflow SET stage = ?, completed_at = NOW() WHERE order_id = ?")
-                ->execute([STAGE_QUALITY_INSPECTION, $order_id]);
+                ->execute([STAGE_QC, $order_id]);
             $pdo->prepare("INSERT INTO production_notes (order_id, author_id, content, note_type) VALUES (?, ?, ?, 'handoff')")
                 ->execute([$order_id, $user_id, $notes ?: 'Submitted for quality inspection']);
+            logGarmentTransition($pdo, $order_id, STAGE_FINISHING, STAGE_QC, $user_id, $notes ?: 'Submitted for QC');
 
-            // Log garment tracking
-            logGarmentTransition($pdo, $order_id, $from_stage, STAGE_QUALITY_INSPECTION, $user_id, $notes ?: 'Submitted for QC');
-
-            // Create QC inspection record
             $checkIns = $pdo->prepare("SELECT inspection_id FROM qc_inspections WHERE order_id = ?");
             $checkIns->execute([$order_id]);
             if (!$checkIns->fetch()) {
@@ -229,11 +193,22 @@ try {
             }
 
             $pdo->commit();
+
+            // Notify QC inspectors
+            $qcUsers = $pdo->prepare("SELECT user_id FROM users WHERE role = 'quality_control_inspector' AND status = 'Active'");
+            $qcUsers->execute();
+            foreach ($qcUsers->fetchAll(PDO::FETCH_COLUMN) as $qcId) {
+                $notif->create($qcId, "Order #ORD-{$order_id} is ready for QC inspection.");
+            }
+
             echo json_encode(['success' => true, 'message' => 'Submitted for QC']);
             break;
 
-        // ── QC Review (admin/employee with QC role) ──
+        // ── QC Review ──
         case 'qc_review':
+            if (!in_array($role, [ROLE_QUALITY_CONTROL_INSPECTOR, ROLE_ADMIN], true)) {
+                throw new Exception('Only QC Inspector can review');
+            }
             $order_id = (int)($_POST['order_id'] ?? 0);
             $result = $_POST['result'] ?? '';
             if (!in_array($result, ['Passed','Failed'])) throw new Exception('Invalid result');
@@ -251,7 +226,6 @@ try {
 
             $pdo->beginTransaction();
 
-            // Upsert inspection record
             $insStmt = $pdo->prepare("SELECT inspection_id FROM qc_inspections WHERE order_id = ?");
             $insStmt->execute([$order_id]);
             $existing = $insStmt->fetch();
@@ -275,7 +249,6 @@ try {
                 $updateCols[] = "required_corrections = ?";
                 $updateParams[] = $_POST['required_corrections'] ?? null;
                 $updateParams[] = $order_id;
-
                 $pdo->prepare("UPDATE qc_inspections SET " . implode(', ', $updateCols) . " WHERE order_id = ?")
                     ->execute($updateParams);
             } else {
@@ -286,51 +259,107 @@ try {
                 $checklist['feedback'] = $_POST['feedback'] ?? null;
                 $checklist['required_corrections'] = $_POST['required_corrections'] ?? null;
                 $checklist['order_id'] = $order_id;
-
                 $cols = implode(', ', array_keys($checklist));
                 $vals = implode(', ', array_fill(0, count($checklist), '?'));
                 $pdo->prepare("INSERT INTO qc_inspections ({$cols}) VALUES ({$vals})")
                     ->execute(array_values($checklist));
             }
 
-            // Update workflow stage based on result
             if ($result === 'Passed') {
                 $pdo->prepare("UPDATE order_workflow SET stage = ?, completed_at = NOW() WHERE order_id = ?")
-                    ->execute([STAGE_PACKAGING, $order_id]);
-                logGarmentTransition($pdo, $order_id, STAGE_QUALITY_INSPECTION, STAGE_PACKAGING, $user_id, 'QC Passed');
+                    ->execute([STAGE_READY_FOR_RELEASE, $order_id]);
+                logGarmentTransition($pdo, $order_id, STAGE_QC, STAGE_READY_FOR_RELEASE, $user_id, 'QC Passed');
             } else {
-                $pdo->prepare("INSERT INTO rework_log (order_id, triggered_by, from_stage, to_stage, reason, notes) VALUES (?, ?, 'Quality Inspection', 'Rework', ?, ?)")
-                    ->execute([$order_id, $user_id, $_POST['failure_reason'] ?? 'Failed QC', $_POST['required_corrections'] ?? '']);
+                // Create NCR
+                $ncrNumber = 'NCR-' . str_pad($order_id, 5, '0', STR_PAD_LEFT) . '-' . date('y') . sprintf('%02d', mt_rand(1, 99));
+                $defectType = $_POST['defect_type'] ?? 'major';
+                $description = $_POST['failure_reason'] ?? 'Failed QC';
+                $pdo->prepare("INSERT INTO ncr_reports (ncr_number, order_id, inspector_id, stage_at_fault, defect_type, description, root_cause, corrective_action, assigned_to, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')")
+                    ->execute([$ncrNumber, $order_id, $user_id, STAGE_QC, $defectType, $description, $_POST['root_cause'] ?? null, $_POST['corrective_action'] ?? null, $wf['assigned_employee'] ?? null]);
+                $ncrId = $pdo->lastInsertId();
+
+                $pdo->prepare("INSERT INTO rework_log (order_id, triggered_by, from_stage, to_stage, reason, notes, ncr_id) VALUES (?, ?, 'QC', 'Rework', ?, ?, ?)")
+                    ->execute([$order_id, $user_id, $description, $_POST['required_corrections'] ?? '', $ncrId]);
                 $pdo->prepare("UPDATE order_workflow SET stage = ? WHERE order_id = ?")
                     ->execute([STAGE_REWORK, $order_id]);
-                logGarmentTransition($pdo, $order_id, STAGE_QUALITY_INSPECTION, STAGE_REWORK, $user_id, $_POST['failure_reason'] ?? 'QC Failed');
+                logGarmentTransition($pdo, $order_id, STAGE_QC, STAGE_REWORK, $user_id, $description);
             }
 
             $pdo->commit();
 
-            // Notify assigned employee
             $empStmt = $pdo->prepare("SELECT assigned_employee FROM order_workflow WHERE order_id = ?");
             $empStmt->execute([$order_id]);
             $assigned = $empStmt->fetchColumn();
             if ($assigned) {
                 $msg = $result === 'Passed'
-                    ? "Your order #ORD-{$order_id} passed QC and moved to Packaging."
-                    : "Your order #ORD-{$order_id} failed QC. Please check feedback.";
+                    ? "Order #ORD-{$order_id} passed QC."
+                    : "Order #ORD-{$order_id} failed QC. NCR created.";
                 $notif->create($assigned, $msg);
             }
 
-            // Notify customer
             $ownerStmt = $pdo->prepare("SELECT user_id FROM orders WHERE order_id = ?");
             $ownerStmt->execute([$order_id]);
             $owner = $ownerStmt->fetchColumn();
             if ($owner) {
                 $msg = $result === 'Passed'
                     ? "Your order #ORD-{$order_id} passed quality inspection."
-                    : "Your order #ORD-{$order_id} needs rework. We'll update you.";
+                    : "Your order #ORD-{$order_id} needs rework.";
                 $notif->create($owner, $msg);
             }
 
             echo json_encode(['success' => true, 'result' => $result]);
+            break;
+
+        // ── Inventory: reserve materials ──
+        case 'reserve_materials':
+            if (!in_array($role, [ROLE_INVENTORY_MANAGER, ROLE_ADMIN], true)) {
+                throw new Exception('Only inventory manager can reserve materials');
+            }
+            $order_id = (int)($_POST['order_id'] ?? 0);
+            $items_json = $_POST['items'] ?? '[]';
+            $items = json_decode($items_json, true);
+            if (!$order_id || empty($items)) throw new Exception('Invalid parameters');
+
+            $wf = getWorkflowOrThrow($pdo, $order_id);
+            if (!in_array($wf['stage'], [STAGE_WAITING_MATERIALS, STAGE_READY_FOR_PRODUCTION], true)) {
+                throw new Exception('Order is not waiting for materials');
+            }
+
+            $pdo->beginTransaction();
+            foreach ($items as $item) {
+                $invId = (int)($item['inventory_id'] ?? 0);
+                $qty = (float)($item['quantity'] ?? 0);
+                if (!$invId || $qty <= 0) continue;
+
+                // Check stock
+                $stock = $pdo->prepare("SELECT quantity FROM inventory WHERE inventory_id = ?");
+                $stock->execute([$invId]);
+                $avail = (float)$stock->fetchColumn();
+                if ($avail < $qty) throw new Exception("Insufficient stock for item #{$invId}");
+
+                // Reserve
+                $pdo->prepare("INSERT INTO inventory_reservations (order_id, inventory_id, reserved_qty, unit, status, reserved_by) VALUES (?, ?, ?, ?, 'reserved', ?)")
+                    ->execute([$order_id, $invId, $qty, $item['unit'] ?? 'piece', $user_id]);
+
+                // Also allocate in order_materials
+                $pdo->prepare("INSERT INTO order_materials (order_id, inventory_id, allocated_qty, unit) VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE allocated_qty = allocated_qty + ?")
+                    ->execute([$order_id, $invId, $qty, $item['unit'] ?? 'piece', $qty]);
+            }
+
+            $pdo->prepare("UPDATE order_workflow SET stage = ? WHERE order_id = ?")
+                ->execute([STAGE_MATERIALS_RESERVED, $order_id]);
+
+            $pdo->commit();
+
+            // Notify ops manager
+            $opsUsers = $pdo->prepare("SELECT user_id FROM users WHERE role = 'operations_manager' AND status = 'Active'");
+            $opsUsers->execute();
+            foreach ($opsUsers->fetchAll(PDO::FETCH_COLUMN) as $opsId) {
+                $notif->create($opsId, "Materials reserved for order #ORD-{$order_id}.");
+            }
+
+            echo json_encode(['success' => true, 'stage' => STAGE_MATERIALS_RESERVED]);
             break;
 
         // ── Upload progress media ──
@@ -371,7 +400,7 @@ try {
         case 'get_board':
             $stage_filter = $_GET['stage'] ?? '';
             $sql = "
-                SELECT o.order_id, o.order_date, o.total_price, o.status,
+                SELECT o.order_id, o.order_date, o.total_price, o.status, o.payment_status,
                        ow.stage, ow.priority, ow.assigned_employee, ow.expected_completion,
                        ow.product_type, ow.started_at,
                        u.full_name AS customer_name,
@@ -397,7 +426,6 @@ try {
             $stmt->execute($params);
             $orders = $stmt->fetchAll();
 
-            // Enrich order data
             foreach ($orders as &$ord) {
                 $ord['days_remaining'] = $ord['expected_completion']
                     ? max(0, (strtotime($ord['expected_completion']) - time()) / 86400)
@@ -405,38 +433,28 @@ try {
                 $ord['is_overdue'] = $ord['expected_completion'] && strtotime($ord['expected_completion']) < time();
                 $ord['progress'] = getStageProgress($ord['stage']);
 
-                // Get design preview
                 $fileStmt = $pdo->prepare("SELECT file_path FROM order_files WHERE order_id = ? LIMIT 1");
                 $fileStmt->execute([$ord['order_id']]);
                 $ord['design_preview'] = $fileStmt->fetchColumn();
 
-                // Total item count
                 $detStmt = $pdo->prepare("SELECT SUM(quantity) FROM order_details WHERE order_id = ?");
                 $detStmt->execute([$ord['order_id']]);
                 $ord['total_quantity'] = (int) $detStmt->fetchColumn();
 
-                // Batch progress: estimate items completed through this stage
                 $ord['stage_quantities'] = [];
                 try {
-                    $scStmt = $pdo->prepare("
-                        SELECT COALESCE(SUM(od.quantity), 0) as qty
-                        FROM order_details od
-                        WHERE od.order_id = ?
-                    ");
+                    $scStmt = $pdo->prepare("SELECT COALESCE(SUM(od.quantity), 0) as qty FROM order_details od WHERE od.order_id = ?");
                     $scStmt->execute([$ord['order_id']]);
                     $totalDet = (int)$scStmt->fetchColumn();
-                    // Estimate items at this stage as total * stage_progress / 100 (approximate)
                     $estQty = round($totalDet * ($ord['progress'] / 100));
                     $ord['stage_quantities'][$ord['stage']] = $estQty;
-                } catch (Exception $e) {
-                    // Silently fail if garment_tracking doesn't exist
-                }
+                } catch (Exception $e) {}
             }
 
             echo json_encode(['orders' => $orders]);
             break;
 
-        // ── Get garment-level tracking for an order ──
+        // ── Get garment-level tracking ──
         case 'get_garment_tracking':
             $order_id = (int)($_GET['order_id'] ?? 0);
             if (!$order_id) throw new Exception('Order ID required');
@@ -466,6 +484,34 @@ try {
                 'garments' => $garments->fetchAll(),
                 'history' => $history->fetchAll(),
             ]);
+            break;
+
+        // ── NCR: list for an order ──
+        case 'get_ncr':
+            $order_id = (int)($_GET['order_id'] ?? 0);
+            if (!$order_id) throw new Exception('Order ID required');
+            $ncrStmt = $pdo->prepare("
+                SELECT n.*, u.full_name AS inspector_name
+                FROM ncr_reports n
+                LEFT JOIN users u ON n.inspector_id = u.user_id
+                WHERE n.order_id = ?
+                ORDER BY n.created_at DESC
+            ");
+            $ncrStmt->execute([$order_id]);
+            echo json_encode(['ncrs' => $ncrStmt->fetchAll()]);
+            break;
+
+        // ── NCR: update status ──
+        case 'update_ncr':
+            if (!in_array($role, [ROLE_QUALITY_CONTROL_INSPECTOR, ROLE_ADMIN, ROLE_OPERATIONS_MANAGER], true)) {
+                throw new Exception('Unauthorized');
+            }
+            $ncr_id = (int)($_POST['ncr_id'] ?? 0);
+            $status = $_POST['status'] ?? '';
+            if (!in_array($status, ['open','in_progress','resolved','closed'])) throw new Exception('Invalid status');
+            $pdo->prepare("UPDATE ncr_reports SET status = ?, resolved_at = IF(? IN ('resolved','closed'), NOW(), NULL) WHERE ncr_id = ?")
+                ->execute([$status, $status, $ncr_id]);
+            echo json_encode(['success' => true]);
             break;
 
         default:
