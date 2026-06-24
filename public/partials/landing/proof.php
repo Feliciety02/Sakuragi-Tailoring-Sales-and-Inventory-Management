@@ -18,72 +18,32 @@ $reviews = [
         'name' => 'Gush & Go Team',
         'role' => 'Basketball uniform batch',
     ],
-    [
-        'file' => 'review-maroon-team-group.jpg',
-        'quote' => 'From design approval to release, the process stayed organized and the final set looked professional.',
-        'name' => 'AKL Car Flex',
-        'role' => 'Custom league uniforms',
-    ],
-    [
-        'file' => 'review-basketball-night-group.jpg',
-        'quote' => 'Our team uniforms were delivered clean and game-ready, and the final look matched the design well.',
-        'name' => 'Panacan Selection',
-        'role' => 'Basketball team set',
-    ],
-    [
-        'file' => 'review-juniors-blue-group.jpg',
-        'quote' => 'The juniors uniforms came out bright, complete, and easy to recognize during the event.',
-        'name' => 'Jokers Juniors',
-        'role' => 'Youth team uniforms',
-    ],
-    [
-        'file' => 'review-granville-red-group.jpg',
-        'quote' => 'The red set looked sharp on court and the whole batch felt consistent from player to player.',
-        'name' => 'Granville Team',
-        'role' => 'League basketball uniforms',
-    ],
 ];
 
 $proofs = [
     [
-        'file' => 'work-volleyball-blue-mockup.jpg',
-        'title' => 'Volleyball jersey mockup',
-        'caption' => 'Front-and-back sublimation concept prepared for production.',
-    ],
-    [
         'file' => 'work-basketball-white-green.jpg',
-        'title' => 'White and green basketball set',
-        'caption' => 'Complete front, back, and shorts layout for a custom team order.',
+        'title' => 'White & green set',
     ],
     [
         'file' => 'work-basketball-black-red.jpg',
-        'title' => 'Black and red team uniform',
-        'caption' => 'High-contrast custom jersey concept with matching shorts.',
+        'title' => 'Black & red uniform',
+    ],
+    [
+        'file' => 'work-volleyball-blue-mockup.jpg',
+        'title' => 'Volleyball jersey',
     ],
     [
         'file' => 'work-basketball-blue-set.jpg',
-        'title' => 'Dark blue basketball set',
-        'caption' => 'Completed jersey and shorts set with numbering and name layout.',
+        'title' => 'Dark blue set',
     ],
     [
         'file' => 'work-basketball-gold-blue.jpg',
-        'title' => 'Gold and blue concept set',
-        'caption' => 'Full basketball uniform layout with custom pattern, numbering, and shorts.',
-    ],
-    [
-        'file' => 'work-basketball-jokers-blue.jpg',
-        'title' => 'Blue team uniform mockup',
-        'caption' => 'Clean front, back, and shorts presentation for a custom team order.',
-    ],
-    [
-        'file' => 'work-basketball-granville-red.jpg',
-        'title' => 'Red basketball set',
-        'caption' => 'Minimal red-and-navy jersey concept prepared for production approval.',
+        'title' => 'Gold & blue concept',
     ],
     [
         'file' => 'work-bowling-black-red.jpg',
-        'title' => 'Bowling shirt concept',
-        'caption' => 'Custom black-and-red performance shirt prepared as a production sample.',
+        'title' => 'Bowling shirt',
     ],
 ];
 
@@ -92,101 +52,159 @@ $proofBaseUrl = '/public/assets/images/proofs/';
 ?>
 
 <section class="section social-proof-section" id="proofs">
-  <div class="container social-proof-layout">
-    <div class="section-header align-left social-proof-header">
+  <div class="container">
+    <div class="section-header align-left" style="max-width:680px">
       <span class="section-kicker">Client reviews and proof of work</span>
       <h2>Real mockups, real team releases, and finished uniforms worn in actual events.</h2>
       <p>Sakuragi handles custom uniforms, team shirts, and production-ready layouts for customers who want dependable work and cleaner coordination.</p>
     </div>
 
-    <div class="review-carousel fade-up" data-review-carousel>
-      <div class="review-carousel-head">
-        <div>
-          <span class="section-kicker">Client reviews</span>
-          <p>Real feedback from customers who trusted us with their orders.</p>
+    <div class="bento-grid">
+      <!-- Featured Review (2×2) -->
+      <?php $r0 = $reviews[0]; $r0path = $proofBaseDir . $r0['file']; ?>
+      <article class="bento-card bento-featured">
+        <div class="bento-media">
+          <?php if (file_exists($r0path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $r0['file']) ?>" alt="<?= htmlspecialchars($r0['name']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-users"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay">
+            <div class="bento-stars" aria-hidden="true"><?php for ($i=0;$i<5;$i++): ?><i class="fas fa-star"></i><?php endfor; ?></div>
+            <p class="bento-quote">"<?= htmlspecialchars($r0['quote']) ?>"</p>
+            <div class="bento-author">
+              <strong><?= htmlspecialchars($r0['name']) ?></strong>
+              <span><?= htmlspecialchars($r0['role']) ?></span>
+            </div>
+          </div>
         </div>
-        <div class="proof-carousel-actions">
-          <button type="button" class="proof-nav" data-review-prev aria-label="Previous review">
-            <i class="fas fa-arrow-left"></i>
-          </button>
-          <button type="button" class="proof-nav" data-review-next aria-label="Next review">
-            <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
+      </article>
 
-      <div class="review-viewport">
-        <div class="review-gallery">
-          <?php foreach ($reviews as $review): ?>
-            <?php $reviewPath = $proofBaseDir . $review['file']; ?>
-            <article class="review-card">
-              <div class="review-photo">
-                <?php if (file_exists($reviewPath)): ?>
-                  <img src="<?= htmlspecialchars($proofBaseUrl . $review['file']) ?>" alt="<?= htmlspecialchars($review['name']) ?>">
-                <?php else: ?>
-                  <div class="proof-placeholder">
-                    <i class="fas fa-users"></i>
-                    <span><?= htmlspecialchars($review['name']) ?></span>
-                  </div>
-                <?php endif; ?>
-              </div>
-              <div class="review-content">
-                <div class="review-stars" aria-hidden="true">
-                  <?php for ($i = 0; $i < 5; $i++): ?>
-                    <i class="fas fa-star"></i>
-                  <?php endfor; ?>
-                </div>
-                <p>"<?= htmlspecialchars($review['quote']) ?>"</p>
-                <div class="review-meta">
-                  <strong><?= htmlspecialchars($review['name']) ?></strong>
-                  <span><?= htmlspecialchars($review['role']) ?></span>
-                </div>
-              </div>
-            </article>
-          <?php endforeach; ?>
+      <!-- Review Card 2 -->
+      <?php $r1 = $reviews[1]; $r1path = $proofBaseDir . $r1['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($r1path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $r1['file']) ?>" alt="<?= htmlspecialchars($r1['name']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-users"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay">
+            <p class="bento-quote bento-quote-sm">"<?= htmlspecialchars($r1['quote']) ?>"</p>
+            <div class="bento-author">
+              <strong><?= htmlspecialchars($r1['name']) ?></strong>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </article>
 
-    <div class="proof-carousel fade-up" data-proof-carousel>
-      <div class="proof-carousel-head">
-        <div>
-          <span class="section-kicker">Design previews</span>
-          <p>Custom shirt and uniform concepts prepared for approval before production.</p>
+      <!-- Review Card 3 -->
+      <?php $r2 = $reviews[2]; $r2path = $proofBaseDir . $r2['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($r2path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $r2['file']) ?>" alt="<?= htmlspecialchars($r2['name']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-users"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay">
+            <p class="bento-quote bento-quote-sm">"<?= htmlspecialchars($r2['quote']) ?>"</p>
+            <div class="bento-author">
+              <strong><?= htmlspecialchars($r2['name']) ?></strong>
+            </div>
+          </div>
         </div>
-        <div class="proof-carousel-actions">
-          <button type="button" class="proof-nav" data-proof-prev aria-label="Previous work sample">
-            <i class="fas fa-arrow-left"></i>
-          </button>
-          <button type="button" class="proof-nav" data-proof-next aria-label="Next work sample">
-            <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
+      </article>
 
-      <div class="proof-viewport">
-        <div class="proof-gallery">
-          <?php foreach ($proofs as $proof): ?>
-            <?php $proofPath = $proofBaseDir . $proof['file']; ?>
-            <article class="proof-card">
-              <div class="proof-media">
-                <?php if (file_exists($proofPath)): ?>
-                  <img src="<?= htmlspecialchars($proofBaseUrl . $proof['file']) ?>" alt="<?= htmlspecialchars($proof['title']) ?>">
-                <?php else: ?>
-                  <div class="proof-placeholder">
-                    <i class="fas fa-image"></i>
-                    <span><?= htmlspecialchars($proof['title']) ?></span>
-                  </div>
-                <?php endif; ?>
-              </div>
-              <div class="proof-copy">
-                <strong><?= htmlspecialchars($proof['title']) ?></strong>
-                <p><?= htmlspecialchars($proof['caption']) ?></p>
-              </div>
-            </article>
-          <?php endforeach; ?>
+      <!-- Mockup 1 -->
+      <?php $p0 = $proofs[0]; $p0path = $proofBaseDir . $p0['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p0path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p0['file']) ?>" alt="<?= htmlspecialchars($p0['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p0['title']) ?></span>
+          </div>
         </div>
-      </div>
+      </article>
+
+      <!-- Mockup 2 -->
+      <?php $p1 = $proofs[1]; $p1path = $proofBaseDir . $p1['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p1path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p1['file']) ?>" alt="<?= htmlspecialchars($p1['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p1['title']) ?></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mockup 3 -->
+      <?php $p2 = $proofs[2]; $p2path = $proofBaseDir . $p2['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p2path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p2['file']) ?>" alt="<?= htmlspecialchars($p2['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p2['title']) ?></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mockup 4 -->
+      <?php $p3 = $proofs[3]; $p3path = $proofBaseDir . $p3['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p3path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p3['file']) ?>" alt="<?= htmlspecialchars($p3['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p3['title']) ?></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mockup 5 -->
+      <?php $p4 = $proofs[4]; $p4path = $proofBaseDir . $p4['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p4path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p4['file']) ?>" alt="<?= htmlspecialchars($p4['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p4['title']) ?></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Mockup 6 -->
+      <?php $p5 = $proofs[5]; $p5path = $proofBaseDir . $p5['file']; ?>
+      <article class="bento-card">
+        <div class="bento-media">
+          <?php if (file_exists($p5path)): ?>
+            <img src="<?= htmlspecialchars($proofBaseUrl . $p5['file']) ?>" alt="<?= htmlspecialchars($p5['title']) ?>">
+          <?php else: ?>
+            <div class="bento-placeholder"><i class="fas fa-image"></i></div>
+          <?php endif; ?>
+          <div class="bento-overlay bento-overlay-light">
+            <span class="bento-label"><?= htmlspecialchars($p5['title']) ?></span>
+          </div>
+        </div>
+      </article>
     </div>
   </div>
 </section>

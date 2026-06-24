@@ -2,24 +2,19 @@ let currentStep = 1;
 const totalSteps = 6;
 
 function updateStepper() {
-    const steps = document.querySelectorAll('.progress-step');
-    const fillBar = document.querySelector('.progress-bar-fill');
+    const steps = document.querySelectorAll('.wizard-step');
+    const fillBar = document.getElementById('progressBarFill');
     const stepBoxes = document.querySelectorAll('.step-box');
 
     steps.forEach((step, index) => {
-        const circle = step.querySelector('.step-circle');
+        const circle = step.querySelector('.wizard-step-circle');
         if (index + 1 < currentStep) {
-            circle.classList.add('completed');
-            circle.classList.remove('active');
             step.classList.add('completed');
             step.classList.remove('active');
         } else if (index + 1 === currentStep) {
-            circle.classList.add('active');
-            circle.classList.remove('completed');
             step.classList.add('active');
             step.classList.remove('completed');
         } else {
-            circle.classList.remove('completed', 'active');
             step.classList.remove('completed', 'active');
         }
     });
@@ -35,7 +30,7 @@ function updateStepper() {
             fillBar.style.width = '4px';
         } else {
             fillBar.style.width = percentage + '%';
-            fillBar.style.height = '4px';
+            fillBar.style.height = '6px';
         }
     }
 
@@ -43,12 +38,20 @@ function updateStepper() {
         box.classList.toggle('active', index + 1 === currentStep);
     });
 
-    // Reset button state on step change
-    setNextButtonState(false);
     setupStep(currentStep);
 
-    document.getElementById('prevBtn').disabled = currentStep === 1;
-    document.getElementById('nextBtn').innerText = currentStep === totalSteps ? 'Finish' : 'Next';
+    const footer = document.querySelector('.step-footer');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    if (currentStep === totalSteps) {
+        if (footer) footer.style.display = 'none';
+    } else {
+        if (footer) footer.style.display = '';
+        setNextButtonState(false);
+        if (prevBtn) prevBtn.disabled = currentStep === 1;
+        if (nextBtn) nextBtn.innerText = 'Next';
+    }
 }
 
 function nextStep() {
@@ -65,18 +68,34 @@ function nextStep() {
     }
 }
 
+function showStatus(msg, type) {
+    const el = document.getElementById('orderSubmissionStatus');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = type === 'error' ? 'var(--color-danger)' : type === 'success' ? 'var(--color-success)' : 'var(--color-info)';
+    el.style.color = '#fff';
+    el.style.padding = '10px 14px';
+    el.style.borderRadius = 'var(--radius-sm)';
+    el.style.fontSize = '0.85rem';
+    el.style.marginTop = '12px';
+    el.textContent = msg;
+}
+
 function submitOrder() {
     const nextBtn = document.getElementById('nextBtn');
-    const statusDiv = document.getElementById('orderSubmissionStatus');
     if (nextBtn) { nextBtn.disabled = true; nextBtn.textContent = 'Submitting...'; }
-    if (statusDiv) {
-        statusDiv.className = 'alert alert-info mt-3';
-        statusDiv.textContent = 'Submitting your order...';
-        statusDiv.classList.remove('d-none');
+    showStatus('Submitting your order...', 'info');
+
+    let serviceData, orderData;
+    try {
+        serviceData = JSON.parse(sessionStorage.getItem('selectedService'));
+        orderData = JSON.parse(sessionStorage.getItem('orderSummaryData'));
+    } catch (e) {
+        showStatus('Session data missing. Please start over.', 'error');
+        if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Finish'; }
+        return;
     }
 
-    const serviceData = JSON.parse(sessionStorage.getItem('selectedService'));
-    const orderData = JSON.parse(sessionStorage.getItem('orderSummaryData'));
     const refNum = document.getElementById('referenceNumber')?.value?.trim() || '';
 
     const formData = new FormData();
@@ -105,25 +124,19 @@ function submitOrder() {
     })
     .then(res => res.json())
     .then(data => {
+        console.log('submit response:', data);
         if (data.success) {
             sessionStorage.setItem('submittedOrderId', data.order_id);
             currentStep = 6;
             updateStepper();
         } else {
-            if (statusDiv) {
-                statusDiv.className = 'alert alert-danger mt-3';
-                statusDiv.textContent = data.error || 'Order submission failed. Please try again.';
-                statusDiv.classList.remove('d-none');
-            }
+            showStatus(data.error || 'Order submission failed. Please try again.', 'error');
             if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Finish'; }
         }
     })
     .catch(err => {
-        if (statusDiv) {
-            statusDiv.className = 'alert alert-danger mt-3';
-            statusDiv.textContent = 'Network error. Please check your connection and try again.';
-            statusDiv.classList.remove('d-none');
-        }
+        console.error('Submit error:', err);
+        showStatus('Network error. Check console for details.', 'error');
         if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Finish'; }
     });
 }
@@ -135,18 +148,20 @@ function prevStep() {
     }
 }
 
-// Reusable button toggle
 function setNextButtonState(enabled) {
     const nextBtn = document.getElementById('nextBtn');
     if (nextBtn) {
         nextBtn.disabled = !enabled;
-        nextBtn.classList.toggle('btn-primary', enabled);
-        nextBtn.classList.toggle('btn-secondary', !enabled);
-        nextBtn.classList.toggle('disabled', !enabled);
+        if (!enabled) {
+            nextBtn.style.opacity = '0.5';
+            nextBtn.style.cursor = 'not-allowed';
+        } else {
+            nextBtn.style.opacity = '1';
+            nextBtn.style.cursor = 'pointer';
+        }
     }
 }
 
-// Per-step initialization
 function setupStep(step) {
     switch (step) {
         case 1: setupStep1(); break;
@@ -154,11 +169,10 @@ function setupStep(step) {
         case 3: setupStep3(); break;
         case 4: setupStep4(); break;
         case 5: setupStep5(); break;
-        case 6: break;
+        case 6: setupStep6(); break;
     }
 }
 
-// Validation for each step before proceeding
 function validateStep(step) {
     switch (step) {
         case 1: return validateStep1();
@@ -170,7 +184,6 @@ function validateStep(step) {
     }
 }
 
-// -------- STEP 1: SERVICE --------
 function setupStep1() {
     const selected = sessionStorage.getItem('selectedService');
     setNextButtonState(!!selected);
@@ -179,20 +192,15 @@ function validateStep1() {
     return !!sessionStorage.getItem('selectedService');
 }
 
-// -------- STEP 2: UPLOAD --------
 function setupStep2() {
   const uploaded = sessionStorage.getItem('uploadedDesign');
-  setNextButtonState(!!uploaded); // this must be called after DOM updates
+  setNextButtonState(!!uploaded);
 }
 
 function validateStep2() {
   return !!sessionStorage.getItem('uploadedDesign');
 }
 
-
-// -------- STEP 3: CUSTOMIZE --------
-
-// Setup logic when Step 3 is activated
 function setupStep3() {
     const isCustom = document.getElementById('customizable')?.checked;
     const isStandard = document.getElementById('standard')?.checked;
@@ -201,13 +209,12 @@ function setupStep3() {
         const hasCustomData = document.getElementById('customizableTableData')?.value.length > 0;
         setNextButtonState(hasCustomData);
     } else if (isStandard) {
-        updateStandardValidation(); // will internally call setNextButtonState
+        updateStandardValidation();
     } else {
         setNextButtonState(false);
     }
 }
 
-// Validation logic before moving to Step 4
 function validateStep3() {
     const isCustom = document.getElementById('customizable')?.checked;
     const isStandard = document.getElementById('standard')?.checked;
@@ -232,16 +239,16 @@ function validateStep3() {
     return false;
 }
 
-
-// -------- STEP 4: SUMMARY --------
 function setupStep4() {
     setNextButtonState(true);
+    if (typeof displayOrderSummary === 'function') {
+        setTimeout(displayOrderSummary, 0);
+    }
 }
 function validateStep4() {
     return true;
 }
 
-// -------- STEP 5: PAYMENT --------
 function setupStep5() {
     const paymentInput = document.getElementById('paymentProof');
     const hasFile = paymentInput && paymentInput.files && paymentInput.files.length > 0;
@@ -262,6 +269,21 @@ function validateStep5() {
         return false;
     }
     return true;
+}
+
+function setupStep6() {
+    const orderId = sessionStorage.getItem('submittedOrderId');
+    const el = document.getElementById('completedOrderId');
+    if (orderId && el) {
+        el.textContent = 'ORD-' + orderId;
+    }
+    sessionStorage.removeItem('selectedService');
+    sessionStorage.removeItem('uploadedDesign');
+    sessionStorage.removeItem('orderSummaryData');
+    sessionStorage.removeItem('uploadedDesignName');
+    sessionStorage.removeItem('uploadedDesignList');
+    sessionStorage.removeItem('standardDesignExcel');
+    sessionStorage.removeItem('submittedOrderId');
 }
 
 document.addEventListener('DOMContentLoaded', updateStepper);

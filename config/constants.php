@@ -94,7 +94,7 @@ $ORDER_STAGES = [
 $STAGE_CONFIG = [
     STAGE_PENDING_VERIFICATION => ['label' => 'Pending Verification',  'color' => '#f59e0b', 'icon' => 'fas fa-inbox'],
     STAGE_CUSTOMER_ACTION      => ['label' => 'Customer Action',       'color' => '#f97316', 'icon' => 'fas fa-user-edit'],
-    STAGE_READY_FOR_PRODUCTION => ['label' => 'Ready for Production',  'color' => '#3b82f6', 'icon' => 'fas fa-check-double'],
+    STAGE_READY_FOR_PRODUCTION => ['label' => 'Ready for Production',  'color' => '#b91c1c', 'icon' => 'fas fa-check-double'],
     STAGE_WAITING_MATERIALS    => ['label' => 'Waiting for Materials', 'color' => '#8b5cf6', 'icon' => 'fas fa-hourglass-half'],
     STAGE_MATERIALS_RESERVED   => ['label' => 'Materials Reserved',    'color' => '#06b6d4', 'icon' => 'fas fa-warehouse'],
     STAGE_CUTTING              => ['label' => 'Cutting',               'color' => '#06b6d4', 'icon' => 'fas fa-cut'],

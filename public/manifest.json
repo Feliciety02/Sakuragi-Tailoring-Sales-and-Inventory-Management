@@ -1,0 +1,23 @@
+{
+  "name": "Sakuragi Tailoring Shop",
+  "short_name": "Sakuragi",
+  "description": "Sakuragi Tailoring Sales and Inventory Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/public/assets/images/sakuragi-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/assets/images/sakuragi-logo.png",
+      "sizes": "1441x1448",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

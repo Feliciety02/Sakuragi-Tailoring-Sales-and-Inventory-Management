@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
-
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -18,7 +18,6 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $order_id = (int)$_GET['id'];
 $user_id = $_SESSION['user_id'];
 
-// Fetch order
 $stmt = $pdo->prepare("
     SELECT o.*, s.service_name,
            e.full_name AS employee_name,
@@ -37,22 +36,18 @@ if (!$order) {
     exit();
 }
 
-// Items
 $items = $pdo->prepare("SELECT * FROM order_details WHERE order_id = ?");
 $items->execute([$order_id]);
 $orderItems = $items->fetchAll();
 
-// Payment
 $payStmt = $pdo->prepare("SELECT * FROM payments WHERE order_id = ?");
 $payStmt->execute([$order_id]);
 $payment = $payStmt->fetch();
 
-// Files
 $files = $pdo->prepare("SELECT * FROM order_files WHERE order_id = ?");
 $files->execute([$order_id]);
 $designFiles = $files->fetchAll();
 
-// Production notes
 $notes = $pdo->prepare("
     SELECT pn.*, u.full_name AS author_name
     FROM production_notes pn
@@ -63,11 +58,9 @@ $notes = $pdo->prepare("
 $notes->execute([$order_id]);
 $prodNotes = $notes->fetchAll();
 
-// Map internal stage to customer stage
 $customerStage = $CUSTOMER_STAGE_MAP[$order['stage']] ?? 'Processing';
 $progress = getStageProgress($order['stage']);
 
-// Customer timeline stages
 $customerTimeline = [
     CSTAGE_CONFIRMED,
     CSTAGE_PRODUCTION,
@@ -77,187 +70,158 @@ $customerTimeline = [
 ];
 $currentCustomerIdx = array_search($customerStage, $customerTimeline);
 if ($customerStage === CSTAGE_DONE) $currentCustomerIdx = 5;
-<?php
+
 $pageTitle = 'Order Details';
-?>
-<!DOCTYPE html>
+$stageColor = $STAGE_CONFIG[$order['stage']]['color'] ?? 'var(--role-accent)';
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Order Details — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <link rel="stylesheet" href="/public/assets/css/mes.css">
-  <style>
-    body { background: #f5f5f5; }
-    .timeline-step { display:flex;flex-direction:column;align-items:center;position:relative;flex:1 }
-    .timeline-step:not(:last-child)::after { content:'';position:absolute;top:20px;left:55%;width:90%;height:3px;background:#e5e7eb;z-index:0 }
-    .timeline-step.completed:not(:last-child)::after { background:#10b981 }
-    .timeline-step.active:not(:last-child)::after { background:linear-gradient(90deg,#10b981 50%,#e5e7eb 50%) }
-    .timeline-dot { width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:1;border:3px solid #e5e7eb;background:#fff;color:#9ca3af;transition:all .3s }
-    .timeline-step.completed .timeline-dot { background:#10b981;border-color:#10b981;color:#fff }
-    .timeline-step.active .timeline-dot { border-color:var(--mes-primary);color:var(--mes-primary) }
-    .timeline-label { font-size:11px;text-align:center;margin-top:6px;color:#9ca3af;font-weight:500;max-width:80px }
-    .timeline-step.completed .timeline-label { color:#10b981 }
-    .timeline-step.active .timeline-label { color:var(--mes-primary);font-weight:600 }
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
+  <style id="cust-vieworder-styles">
+    .tl-step { display:flex;flex-direction:column;align-items:center;position:relative;flex:1 }
+    .tl-step:not(:last-child)::after { content:'';position:absolute;top:20px;left:55%;width:90%;height:3px;background:var(--border-color,rgba(0,0,0,0.06));z-index:0 }
+    .tl-step.completed:not(:last-child)::after { background:#22c55e }
+    .tl-step.active:not(:last-child)::after { background:linear-gradient(90deg,#22c55e 50%,var(--border-color,rgba(0,0,0,0.06)) 50%) }
+    .tl-dot { width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;position:relative;z-index:1;border:3px solid var(--border-color,rgba(0,0,0,0.06));background:var(--bg-primary,#fff);color:var(--text-tertiary);transition:all .3s }
+    .tl-step.completed .tl-dot { background:#22c55e;border-color:#22c55e;color:#fff }
+    .tl-step.active .tl-dot { border-color:var(--role-accent);color:var(--role-accent) }
+    .tl-label { font-size:11px;text-align:center;margin-top:6px;color:var(--text-tertiary);font-weight:500;max-width:80px }
+    .tl-step.completed .tl-label { color:#22c55e }
+    .tl-step.active .tl-label { color:var(--role-accent);font-weight:600 }
+
+    .item-tile { background:var(--bg-secondary);border-radius:8px;padding:12px 20px;text-align:center;min-width:70px }
+    .item-tile .qty { font-size:16px;font-weight:700;color:var(--text-primary) }
+    .item-tile .size { font-size:11px;color:var(--text-tertiary) }
+
+    .design-thumb { display:block;width:100px;height:100px;border-radius:8px;overflow:hidden;background:var(--bg-secondary);border:1px solid var(--border-color);transition:border-color .2s }
+    .design-thumb:hover { border-color:var(--role-accent) }
+    .design-thumb img { width:100%;height:100%;object-fit:cover }
+    .design-thumb .placeholder { display:flex;align-items:center;justify-content:center;height:100%;font-size:20px;color:var(--text-tertiary) }
   </style>
 </head>
-<body>
+<body data-role="customer">
 <div class="dash-layout">
   <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-  <div class="d-flex align-items-center gap-2 mb-3" style="font-size:12px;color:#6b7280">
-    <a href="my_orders.php" style="color:var(--mes-primary)">My Orders</a>
-    <span>/</span>
-    <span style="color:#374151">#ORD-<?= $order_id ?></span>
-  </div>
+<?php
+$breadcrumb = '<div style="font-size:0.78rem;color:var(--text-tertiary);margin-bottom:8px"><a href="my_orders.php" style="color:var(--role-accent);text-decoration:none">My Orders</a> <span style="margin:0 4px">/</span> <span style="color:var(--text-primary)">#ORD-' . $order_id . '</span></div>';
 
-  <!-- Header -->
-  <div class="mes-card mb-4">
-    <div class="mes-card-body" style="padding:20px 24px">
-      <div class="d-flex justify-content-between align-items-start">
-        <div>
-          <h2 style="font-size:18px;font-weight:700;margin:0">Order #ORD-<?= $order_id ?></h2>
-          <p style="font-size:13px;color:#6b7280;margin:4px 0 0">Placed <?= date('F d, Y', strtotime($order['order_date'])) ?> · <?= htmlspecialchars($order['service_name'] ?? 'Custom') ?></p>
-        </div>
-        <div>
-          <span class="mes-badge mes-badge-primary" style="font-size:13px"><?= htmlspecialchars($customerStage) ?></span>
-        </div>
-      </div>
+// ── Header card with progress ──
+$stageBadge = renderStatusBadge(htmlspecialchars($customerStage), 'accent', 'sm');
+$headerCard = '<div class="panel-card" style="padding:20px 24px;margin-bottom:16px">';
+$headerCard .= '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
+$headerCard .= '<div><h2 style="margin:0;font-size:1.2rem;font-weight:700;color:var(--text-primary)">Order #ORD-' . $order_id . '</h2>';
+$headerCard .= '<p style="margin:4px 0 0;font-size:0.82rem;color:var(--text-tertiary)">Placed ' . date('F d, Y', strtotime($order['order_date'])) . ' · ' . htmlspecialchars($order['service_name'] ?? 'Custom') . '</p></div>';
+$headerCard .= '<div>' . $stageBadge . '</div></div>';
+$headerCard .= '<div style="display:flex;align-items:center;gap:12px"><div style="flex:1;height:8px;background:var(--border-color);border-radius:4px;overflow:hidden"><div style="width:' . $progress . '%;height:100%;background:' . $stageColor . ';border-radius:4px;transition:width .5s"></div></div><span style="font-size:0.82rem;font-weight:600;color:var(--text-secondary)">' . $progress . '%</span></div>';
+$headerCard .= '</div>';
 
-      <!-- Progress -->
-      <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
-        <div style="flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">
-          <div style="width:<?= $progress ?>%;height:100%;background:var(--mes-primary);border-radius:4px;transition:width .5s"></div>
-        </div>
-        <span style="font-size:13px;font-weight:600;color:var(--mes-primary)"><?= $progress ?>%</span>
-      </div>
-    </div>
-  </div>
+// ── Timeline ──
+$timelineHtml = '<div class="panel-card" style="padding:24px;margin-bottom:16px">';
+$timelineHtml .= '<div style="display:flex;justify-content:space-between;padding:0 10px">';
+foreach ($customerTimeline as $i => $stage):
+  $completed = $i < $currentCustomerIdx;
+  $active = $i === $currentCustomerIdx;
+  $cls = $completed ? 'completed' : ($active ? 'active' : '');
+  $timelineHtml .= '<div class="tl-step ' . $cls . '"><div class="tl-dot">';
+  if ($completed):
+    $timelineHtml .= '<i class="fas fa-check"></i>';
+  else:
+    $timelineHtml .= '<i class="fas fa-circle"></i>';
+  endif;
+  $timelineHtml .= '</div><div class="tl-label">' . htmlspecialchars($stage) . '</div></div>';
+endforeach;
+$timelineHtml .= '</div></div>';
 
-  <!-- Customer Timeline -->
-  <div class="mes-card mb-4">
-    <div class="mes-card-body" style="padding:24px">
-      <div style="display:flex;justify-content:space-between;padding:0 10px">
-        <?php foreach ($customerTimeline as $i => $stage):
-          $completed = $i < $currentCustomerIdx;
-          $active = $i === $currentCustomerIdx;
-        ?>
-        <div class="timeline-step <?= $completed ? 'completed' : ($active ? 'active' : '') ?>">
-          <div class="timeline-dot">
-            <?php if ($completed): ?><i class="fas fa-check"></i>
-            <?php elseif ($active): ?><i class="fas fa-circle"></i>
-            <?php else: ?><i class="fas fa-circle"></i><?php endif; ?>
-          </div>
-          <div class="timeline-label"><?= htmlspecialchars($stage) ?></div>
-        </div>
-        <?php endforeach; ?>
-      </div>
-    </div>
-  </div>
+// ── Main content: Production updates + items + files ──
+$mainInner = '';
 
-  <div class="mes-layout">
-    <div class="mes-main">
-      <!-- Production Updates -->
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Production Updates</h3></div>
-        <div class="mes-card-body">
-          <?php if (empty($prodNotes)): ?>
-          <p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:12px 0">No updates yet. We'll post progress here as your order moves through production.</p>
-          <?php else: ?>
-          <div class="mes-feed">
-            <?php foreach ($prodNotes as $n): ?>
-            <div class="mes-feed-item">
-              <div class="mes-feed-icon" style="background:#dbeafe;color:#2563eb">
-                <i class="fas fa-<?= $n['note_type']==='handoff'?'check-double':'comment' ?>"></i>
-              </div>
-              <div class="mes-feed-content">
-                <p><?= htmlspecialchars($n['content']) ?></p>
-                <div class="mes-feed-time"><?= date('M d, g:i A', strtotime($n['created_at'])) ?></div>
-              </div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
-        </div>
-      </div>
+// Production notes
+$prodHtml = renderPageSection('Production Updates', '');
+if (empty($prodNotes)):
+  $prodHtml = renderPageSection('Production Updates', '<p style="font-size:0.82rem;color:var(--text-tertiary);text-align:center;padding:12px 0;margin:0">No updates yet. We\'ll post progress here as your order moves through production.</p>');
+else:
+  $feed = [];
+  foreach ($prodNotes as $n):
+    $icon = $n['note_type'] === 'handoff' ? 'fas fa-check-double' : 'fas fa-comment';
+    $feed[] = ['icon' => $icon, 'text' => htmlspecialchars($n['content']), 'time' => date('M d, g:i A', strtotime($n['created_at'])), 'accent' => 'red'];
+  endforeach;
+  $prodHtml = renderPageSection('Production Updates', renderActivityFeed($feed));
+endif;
+$mainInner .= $prodHtml;
 
-      <!-- Order Items -->
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Order Items</h3></div>
-        <div class="mes-card-body">
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <?php foreach ($orderItems as $item): ?>
-            <div style="background:#f3f4f6;border-radius:8px;padding:12px 20px;text-align:center;min-width:80px">
-              <div style="font-size:16px;font-weight:700;color:#374151"><?= (int)$item['quantity'] ?></div>
-              <div style="font-size:11px;color:#6b7280">Size <?= htmlspecialchars($item['size']) ?></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
-      </div>
+// Order items
+$itemsHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+foreach ($orderItems as $item):
+  $itemsHtml .= '<div class="item-tile"><div class="qty">' . (int)$item['quantity'] . '</div><div class="size">Size ' . htmlspecialchars($item['size']) . '</div></div>';
+endforeach;
+$itemsHtml .= '</div>';
+$mainInner .= renderPageSection('Order Items', $itemsHtml);
 
-      <!-- Design Files -->
-      <?php if (!empty($designFiles)): ?>
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Design Files</h3></div>
-        <div class="mes-card-body">
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <?php foreach ($designFiles as $f):
-              $path = '/public/uploads/designs/' . $f['file_path'];
-              $ext = strtolower(pathinfo($f['file_path'], PATHINFO_EXTENSION));
-              $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
-            ?>
-            <a href="<?= $path ?>" target="_blank" style="display:block;width:100px;height:100px;border-radius:8px;overflow:hidden;background:#f3f4f6;border:1px solid #e5e7eb">
-              <?php if ($isImg): ?>
-              <img src="<?= $path ?>" style="width:100%;height:100%;object-fit:cover">
-              <?php else: ?>
-              <div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:20px;color:#9ca3af"><i class="fas fa-file-alt"></i></div>
-              <?php endif; ?>
-            </a>
-            <?php endforeach; ?>
-          </div>
-        </div>
-      </div>
-      <?php endif; ?>
-    </div>
+// Design files
+if (!empty($designFiles)):
+  $filesHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  foreach ($designFiles as $f):
+    $path = '/public/uploads/designs/' . $f['file_path'];
+    $ext = strtolower(pathinfo($f['file_path'], PATHINFO_EXTENSION));
+    $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+    $filesHtml .= '<a href="' . $path . '" target="_blank" class="design-thumb">';
+    if ($isImg):
+      $filesHtml .= '<img src="' . $path . '" alt="Design">';
+    else:
+      $filesHtml .= '<div class="placeholder"><i class="fas fa-file-alt"></i></div>';
+    endif;
+    $filesHtml .= '</a>';
+  endforeach;
+  $filesHtml .= '</div>';
+  $mainInner .= renderPageSection('Design Files', $filesHtml);
+endif;
 
-    <div class="mes-sidebar-right">
-      <!-- Order Info -->
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Order Details</h3></div>
-        <div class="mes-card-body" style="font-size:13px">
-          <p style="margin:0 0 6px"><strong>Status</strong><br><span class="mes-badge mes-badge-primary"><?= htmlspecialchars($customerStage) ?></span></p>
-          <p style="margin:0 0 6px"><strong>Total</strong><br>₱<?= number_format($order['total_price'], 2) ?></p>
-          <?php if ($order['employee_name']): ?>
-          <p style="margin:0 0 6px"><strong>Assigned Staff</strong><br><?= htmlspecialchars($order['employee_name']) ?></p>
-          <?php endif; ?>
-          <?php if ($order['expected_completion']): ?>
-          <p style="margin:0 0 6px"><strong>Expected Completion</strong><br><?= date('F d, Y', strtotime($order['expected_completion'])) ?></p>
-          <?php endif; ?>
-        </div>
-      </div>
+// ── Sidebar: order info + payment ──
+$sidebarHtml = '<div class="panel-card" style="padding:20px;margin-bottom:12px">';
+$sidebarHtml .= '<h5 style="margin:0 0 12px;font-size:0.9rem;font-weight:700;color:var(--text-primary)">Order Details</h5>';
+$sidebarHtml .= '<div style="font-size:0.82rem;line-height:1.8">';
+$sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Status</strong><br>' . $stageBadge . '</p>';
+$sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Total</strong><br>₱' . number_format($order['total_price'], 2) . '</p>';
+if ($order['employee_name']):
+  $sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Assigned Staff</strong><br>' . htmlspecialchars($order['employee_name']) . '</p>';
+endif;
+if ($order['expected_completion']):
+  $sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Expected Completion</strong><br>' . date('F d, Y', strtotime($order['expected_completion'])) . '</p>';
+endif;
+$sidebarHtml .= '</div></div>';
 
-      <!-- Payment -->
-      <?php if ($payment): ?>
-      <div class="mes-card mb-3">
-        <div class="mes-card-header"><h3 class="mes-card-title">Payment</h3></div>
-        <div class="mes-card-body" style="font-size:13px">
-          <p style="margin:0 0 6px"><strong>Amount</strong><br>₱<?= number_format($payment['amount'], 2) ?></p>
-          <p style="margin:0 0 6px"><strong>Status</strong><br><span class="mes-badge <?= $payment['status']==='Paid'?'mes-badge-success':'mes-badge-warning' ?>"><?= htmlspecialchars($payment['status']) ?></span></p>
-          <?php if ($payment['reference_number']): ?>
-          <p style="margin:0"><strong>Reference</strong><br><?= htmlspecialchars($payment['reference_number']) ?></p>
-          <?php endif; ?>
-        </div>
-      </div>
-      <?php endif; ?>
-    </div>
-  </div>
+if ($payment):
+  $pVariant = $payment['status'] === 'Paid' ? 'success' : 'warning';
+  $sidebarHtml .= '<div class="panel-card" style="padding:20px;margin-bottom:12px">';
+  $sidebarHtml .= '<h5 style="margin:0 0 12px;font-size:0.9rem;font-weight:700;color:var(--text-primary)">Payment</h5>';
+  $sidebarHtml .= '<div style="font-size:0.82rem;line-height:1.8">';
+  $sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Amount</strong><br>₱' . number_format($payment['amount'], 2) . '</p>';
+  $sidebarHtml .= '<p style="margin:0 0 6px"><strong style="color:var(--text-secondary)">Status</strong><br>' . renderStatusBadge(htmlspecialchars($payment['status']), $pVariant, 'sm') . '</p>';
+  if ($payment['reference_number']):
+    $sidebarHtml .= '<p style="margin:0"><strong style="color:var(--text-secondary)">Reference</strong><br>' . htmlspecialchars($payment['reference_number']) . '</p>';
+  endif;
+  $sidebarHtml .= '</div></div>';
+endif;
+
+// ── Combine into two-column layout ──
+$workspace = $breadcrumb . $headerCard . $timelineHtml . renderTwoColumn($mainInner, $sidebarHtml);
+
+echo renderDashboardShell(
+  '',  // no separate header, breadcrumb is in workspace
+  '',
+  $workspace
+);
+?>
     </div>
   </div>
 </div>

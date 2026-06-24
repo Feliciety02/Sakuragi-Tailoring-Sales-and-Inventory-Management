@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+
 $pageTitle = 'My Tasks';
 
 if (get_user_role() === ROLE_CUSTOMER) {
@@ -12,14 +14,12 @@ if (get_user_role() === ROLE_CUSTOMER) {
 
 $user_id = $_SESSION['user_id'];
 
-// Get employee position for stage filtering
 $position = getEmployeePosition($pdo, $user_id);
 $position_id = $position ? (int)$position['position_id'] : 0;
 $allowed_stages = getPositionStages($position_id);
 $stage_placeholders = implode(',', array_fill(0, count($allowed_stages), '?'));
 $stage_params = $allowed_stages;
 
-// Handle "Submit to QC" action (POST from dashboard or inline)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_qc'])) {
     $order_id = (int)$_POST['submit_qc'];
     try {
@@ -38,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_qc'])) {
     }
 }
 
-// Handle stage update via AJAX-style POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_stage'])) {
     $order_id = (int)$_POST['order_id'];
     $new_stage = $_POST['stage'] ?? '';
@@ -107,142 +106,145 @@ if ($status_filter === 'active') {
     $stmt->execute([$user_id]);
     $tasks = $stmt->fetchAll();
 }
-?>
-<!DOCTYPE html>
+
+// Determine role for data-role attribute
+$role = get_user_role();
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Tasks — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <link rel="stylesheet" href="/public/assets/css/mes.css">
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
+  <style id="emp-tasks-styles">
+    .task-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px }
+    .stage-dropdown { position:relative;display:inline-block }
+    .stage-menu { display:none;position:absolute;right:0;top:100%;z-index:20;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);padding:8px;min-width:210px;margin-top:4px }
+    .stage-menu.show { display:block }
+    .stage-menu select { width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.8rem;background:var(--bg-secondary);color:var(--text-primary);margin-bottom:6px }
+    .stage-menu input { width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.8rem;background:var(--bg-secondary);color:var(--text-primary);margin-bottom:6px }
+    .stage-menu .dash-btn { width:100%;justify-content:center;margin-bottom:4px }
+    .stage-menu hr { margin:6px 0;border:none;border-top:1px solid var(--border-color) }
+    .tab-nav { display:flex;gap:4px }
+    .tab-nav .dash-btn { border-radius:8px;font-size:0.8rem }
+    .tab-nav .dash-btn.active { background:var(--role-accent);color:#fff;border-color:var(--role-accent) }
+  </style>
 </head>
-<body>
+<body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
   <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-  <div class="d-flex align-items-center justify-content-between mb-2">
-    <div>
-      <h1 style="font-size:20px;font-weight:700;margin:0">My Tasks</h1>
-      <p style="font-size:13px;color:#6b7280;margin-top:4px"><?= $status_filter === 'active' ? 'Active tasks' : ($status_filter === 'qc' ? 'Pending quality inspection' : 'Completed tasks') ?></p>
-    </div>
-    <div class="d-flex gap-2">
-      <a href="?status=active" class="mes-btn mes-btn-sm <?= $status_filter === 'active' ? 'mes-btn-primary' : '' ?>">Active</a>
-      <a href="?status=qc" class="mes-btn mes-btn-sm <?= $status_filter === 'qc' ? 'mes-btn-primary' : '' ?>">QC</a>
-      <a href="?status=completed" class="mes-btn mes-btn-sm <?= $status_filter === 'completed' ? 'mes-btn-primary' : '' ?>">Completed</a>
-    </div>
+<?php
+// Alert messages
+$alerts = '';
+if (isset($msg)) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:#22c55e;font-size:0.85rem"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($msg) . '</div>';
+if (isset($err)) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#ef4444;font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($err) . '</div>';
+
+$subtitle = $status_filter === 'active' ? 'Active tasks assigned to you' : ($status_filter === 'qc' ? 'Pending quality inspection' : 'Completed tasks');
+
+$pageActions = [
+  ['label' => 'Active', 'href' => '?status=active', 'variant' => $status_filter === 'active' ? 'primary' : 'outline', 'size' => 'sm'],
+  ['label' => 'QC', 'href' => '?status=qc', 'variant' => $status_filter === 'qc' ? 'primary' : 'outline', 'size' => 'sm'],
+  ['label' => 'Completed', 'href' => '?status=completed', 'variant' => $status_filter === 'completed' ? 'primary' : 'outline', 'size' => 'sm'],
+];
+
+$taskCards = '';
+if (empty($tasks)):
+  $taskCards = renderEmptyState('fas fa-tasks', 'No tasks found', 'No ' . $subtitle . '.');
+else:
+  ob_start();
+?>
+<div style="margin-bottom:14px">
+  <div class="search-bar" style="max-width:380px">
+    <i class="fas fa-search search-bar-icon"></i>
+    <input type="text" class="search-bar-input" id="taskSearch" placeholder="Search by order #, customer, or product...">
   </div>
-
-  <div style="margin-bottom:16px">
-    <div style="display:flex;gap:8px;max-width:400px">
-      <input type="text" id="taskSearch" class="mes-form-input" placeholder="Search by order #, customer, or product..." style="flex:1">
-      <button class="mes-btn mes-btn-primary mes-btn-sm" onclick="filterTasks()"><i class="fas fa-search"></i></button>
-    </div>
-  </div>
-
-  <?php if (isset($msg)): ?>
-  <div class="mes-card mb-3" style="padding:12px 20px;background:#d1fae5;border-color:#a7f3d0"><p style="margin:0;font-size:13px;color:#065f46"><?= htmlspecialchars($msg) ?></p></div>
-  <?php endif; ?>
-  <?php if (isset($err)): ?>
-  <div class="mes-card mb-3" style="padding:12px 20px;background:#fef2f2;border-color:#fecaca"><p style="margin:0;font-size:13px;color:#991b1b"><?= htmlspecialchars($err) ?></p></div>
-  <?php endif; ?>
-
-  <?php if (empty($tasks)): ?>
-  <div class="mes-card"><div class="mes-card-body"><p style="font-size:13px;color:#6b7280;margin:0;text-align:center;padding:32px 0">No tasks found</p></div></div>
-  <?php else: ?>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
-    <?php foreach ($tasks as $t): $pct = getStageProgress($t['stage']); ?>
-    <div class="mes-card" id="task-card-<?= $t['order_id'] ?>" style="border-left:3px solid <?= ($t['priority']??'medium') === 'urgent' ? 'var(--mes-danger)' : (($t['priority']??'medium') === 'high' ? 'var(--mes-warning)' : 'var(--mes-info)') ?>">
-      <div class="mes-card-body" style="padding:16px">
-        <div class="d-flex justify-content-between align-items-start mb-2">
-          <div>
-            <strong style="font-size:14px">#ORD-<?= $t['order_id'] ?></strong>
-            <?php if (isset($t['priority'])): ?>
-            <span class="mes-badge <?= $t['priority'] === 'urgent' ? 'mes-badge-danger' : ($t['priority'] === 'high' ? 'mes-badge-warning' : 'mes-badge-gray') ?> ms-1"><?= ucfirst($t['priority']) ?></span>
-            <?php endif; ?>
-            <?php if (isset($t['qc_result'])): ?>
-            <span class="mes-badge <?= $t['qc_result'] === 'Passed' ? 'mes-badge-success' : ($t['qc_result'] === 'Failed' ? 'mes-badge-danger' : 'mes-badge-warning') ?> ms-1"><?= $t['qc_result'] ?? 'Pending' ?></span>
-            <?php endif; ?>
-          </div>
-          <?php if ($status_filter !== 'completed'): ?>
-          <div class="dropdown" style="position:relative">
-            <button class="mes-btn mes-btn-sm" style="padding:2px 8px" onclick="this.nextElementSibling.classList.toggle('show')">⋮</button>
-            <div class="mes-dropdown">
-              <form method="post" style="padding:8px;min-width:200px">
-                <input type="hidden" name="order_id" value="<?= $t['order_id'] ?>">
-                <div class="mes-form-group mb-1">
-                  <select name="stage" class="mes-form-select mes-form-select-sm">
-                    <option value="<?= STAGE_DESIGN_REVIEW ?>" <?= $t['stage']===STAGE_DESIGN_REVIEW?'selected':'' ?>>Design Review</option>
-                    <option value="<?= STAGE_MATERIAL_PREP ?>" <?= $t['stage']===STAGE_MATERIAL_PREP?'selected':'' ?>>Material Prep</option>
-                    <option value="<?= STAGE_CUTTING ?>" <?= $t['stage']===STAGE_CUTTING?'selected':'' ?>>Cutting</option>
-                    <option value="<?= STAGE_PRINTING ?>" <?= $t['stage']===STAGE_PRINTING?'selected':'' ?>>Print/Embroider</option>
-                    <option value="<?= STAGE_SEWING ?>" <?= $t['stage']===STAGE_SEWING?'selected':'' ?>>Sewing & Assembly</option>
-                  </select>
-                </div>
-                <div class="mes-form-group mb-1">
-                  <input type="text" name="notes" class="mes-form-input mes-form-input-sm" placeholder="Notes (optional)">
-                </div>
-                <button type="submit" name="update_stage" class="mes-btn mes-btn-primary mes-btn-sm" style="width:100%">Update</button>
-              </form>
-              <hr style="margin:4px 0">
-              <form method="post">
-                <button type="submit" name="submit_qc" value="<?= $t['order_id'] ?>" class="mes-btn mes-btn-success mes-btn-sm" style="width:100%">Submit to QC</button>
-              </form>
-            </div>
-          </div>
-          <?php endif; ?>
-        </div>
-
-        <p style="font-size:13px;margin:0;color:#374151"><?= htmlspecialchars($t['product_type'] ?? 'Custom Garment') ?></p>
-        <p style="font-size:12px;color:#6b7280;margin:2px 0 8px"><?= htmlspecialchars($t['customer_name']) ?> · Qty: <?= $t['total_qty'] ?? 0 ?></p>
-
-        <?php if ($status_filter !== 'completed'): ?>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
-            <div style="width:<?= $pct ?>%;height:100%;background:<?= $t['priority']==='urgent'?'var(--mes-danger)':($t['priority']==='high'?'var(--mes-warning)':'var(--mes-primary)') ?>;border-radius:3px;transition:width .3s"></div>
-          </div>
-          <span style="font-size:11px;color:#6b7280;white-space:nowrap"><?= $pct ?>%</span>
-        </div>
+</div>
+<div class="task-grid">
+  <?php foreach ($tasks as $t):
+    $pct = getStageProgress($t['stage']);
+    $priorityColor = ($t['priority']??'medium') === 'urgent' ? '#ef4444' : (($t['priority']??'medium') === 'high' ? '#eab308' : 'var(--role-accent)');
+    $pVariant = ($t['priority']??'medium') === 'urgent' ? 'danger' : (($t['priority']??'medium') === 'high' ? 'warning' : 'accent');
+  ?>
+  <div class="task-card" id="task-card-<?= $t['order_id'] ?>" style="border-left:3px solid <?= $priorityColor ?>">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div>
+        <strong style="font-size:0.88rem;color:var(--text-primary)">#ORD-<?= $t['order_id'] ?></strong>
+        <?= renderStatusBadge(ucfirst($t['priority']??'medium'), $pVariant, 'sm') ?>
+        <?php if (isset($t['qc_result'])): ?>
+          <?= renderStatusBadge($t['qc_result'] ?? 'Pending', strtolower($t['qc_result']??'')==='passed'?'success':(strtolower($t['qc_result']??'')==='failed'?'danger':'warning'), 'sm') ?>
         <?php endif; ?>
-
-        <div class="d-flex gap-2">
-          <a href="view_task.php?id=<?= $t['order_id'] ?>" class="mes-btn mes-btn-primary mes-btn-sm"><i class="fas fa-arrow-right"></i> View</a>
+      </div>
+      <?php if ($status_filter !== 'completed'): ?>
+      <div class="stage-dropdown">
+        <button class="dash-btn dash-btn-outline dash-btn-sm" style="padding:2px 8px" onclick="this.nextElementSibling.classList.toggle('show')">⋮</button>
+        <div class="stage-menu">
+          <form method="post">
+            <input type="hidden" name="order_id" value="<?= $t['order_id'] ?>">
+            <select name="stage">
+              <option value="<?= STAGE_DESIGN_REVIEW ?>" <?= $t['stage']===STAGE_DESIGN_REVIEW?'selected':'' ?>>Design Review</option>
+              <option value="<?= STAGE_MATERIAL_PREP ?>" <?= $t['stage']===STAGE_MATERIAL_PREP?'selected':'' ?>>Material Prep</option>
+              <option value="<?= STAGE_CUTTING ?>" <?= $t['stage']===STAGE_CUTTING?'selected':'' ?>>Cutting</option>
+              <option value="<?= STAGE_PRINTING ?>" <?= $t['stage']===STAGE_PRINTING?'selected':'' ?>>Print/Embroider</option>
+              <option value="<?= STAGE_SEWING ?>" <?= $t['stage']===STAGE_SEWING?'selected':'' ?>>Sewing & Assembly</option>
+            </select>
+            <input type="text" name="notes" placeholder="Notes (optional)">
+            <button type="submit" name="update_stage" class="dash-btn dash-btn-primary dash-btn-sm">Update Stage</button>
+          </form>
+          <hr>
+          <form method="post">
+            <button type="submit" name="submit_qc" value="<?= $t['order_id'] ?>" class="dash-btn dash-btn-success dash-btn-sm">Submit to QC</button>
+          </form>
         </div>
       </div>
+      <?php endif; ?>
     </div>
-    <?php endforeach; ?>
+    <p style="font-size:0.82rem;margin:0;color:var(--text-primary)"><?= htmlspecialchars($t['product_type'] ?? 'Custom Garment') ?></p>
+    <p style="font-size:0.75rem;color:var(--text-tertiary);margin:2px 0 8px"><?= htmlspecialchars($t['customer_name']) ?> · Qty: <?= $t['total_qty'] ?? 0 ?></p>
+    <?php if ($status_filter !== 'completed'): ?>
+    <div class="progress-bar" style="margin-bottom:10px">
+      <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= $pct ?>%;background:<?= $priorityColor ?>"></div></div>
+      <span class="progress-bar-label"><?= $pct ?>%</span>
+    </div>
+    <?php endif; ?>
+    <a href="view_task.php?id=<?= $t['order_id'] ?>" class="dash-btn dash-btn-outline dash-btn-sm"><i class="fas fa-arrow-right"></i> View</a>
   </div>
-  <?php endif; ?>
+  <?php endforeach; ?>
 </div>
+<?php
+  $taskCards = ob_get_clean();
+endif;
+
+echo renderDashboardShell(
+  renderPageHeader('My Tasks', $subtitle, '', $pageActions),
+  '',
+  $alerts . $taskCards
+);
+?>
+    </div>
   </div>
 </div>
 
 <script>
 document.addEventListener('click', function(e) {
-  document.querySelectorAll('.mes-dropdown.show').forEach(d => {
+  document.querySelectorAll('.stage-menu.show').forEach(d => {
     if (!d.parentElement.contains(e.target)) d.classList.remove('show');
   });
 });
 
-function filterTasks() {
-  var q = document.getElementById('taskSearch').value.toLowerCase();
+document.getElementById('taskSearch')?.addEventListener('input', function() {
+  var q = this.value.toLowerCase();
   document.querySelectorAll('[id^="task-card-"]').forEach(function(c) {
     c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
-}
-
-document.getElementById('taskSearch').addEventListener('keyup', function(e) {
-  if (e.key === 'Enter') filterTasks();
-  else filterTasks();
 });
-</script>
 
-<script>
 document.getElementById('menuToggle')?.addEventListener('click', function() {
   document.getElementById('sidebar')?.classList.toggle('collapsed');
 });

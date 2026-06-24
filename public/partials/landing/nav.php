@@ -1,9 +1,7 @@
 <nav class="navbar">
   <div class="navbar-inner">
     <a href="/" class="navbar-brand">
-      <span class="brand-mark">
-        <img src="/public/assets/images/sakuragi-logo.png" alt="Sakuragi logo" class="brand-logo">
-      </span>
+      <img src="/public/assets/images/sakuragi-logo.svg" alt="Sakuragi logo" class="brand-logo">
       <span class="brand-copy">
         <strong>Sakuragi</strong>
         <small>Tailoring Main Branch</small>

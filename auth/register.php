@@ -57,7 +57,10 @@ $success = get_flash('success');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <title>Sign Up - Sakuragi</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -172,7 +175,7 @@ $success = get_flash('success');
             <p class="modal-kicker">Sample access</p>
             <h3 id="customer-demo-title">Customer demo</h3>
           </div>
-          <button type="button" class="modal-close" aria-label="Close customer demo" data-modal-close>
+          <button type="button" class="modal-close" aria-label="Close customer demo" data-modal-close onclick="this.closest('[data-modal]').hidden = true; document.body.classList.remove('modal-open');">
             <i class="fas fa-xmark"></i>
           </button>
         </div>

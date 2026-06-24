@@ -2,184 +2,353 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/role_admin_only.php';
 
+$pageTitle = 'Production Operations';
 
-// Fetch all active orders with timeline data
-$orders = $pdo->query("
-    SELECT o.order_id, o.order_date, o.completion_date, o.status,
-           ow.stage, ow.started_at, ow.expected_completion, ow.priority,
-           u.full_name AS customer_name,
-           e.full_name AS employee_name,
-           s.service_name,
-           (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) AS total_qty,
-           (SELECT COUNT(*) FROM order_details WHERE order_id = o.order_id) AS total_items
-    FROM orders o
-    JOIN users u ON o.user_id = u.user_id
-    LEFT JOIN services s ON o.service_id = s.service_id
-    LEFT JOIN order_workflow ow ON o.order_id = ow.order_id
-    LEFT JOIN users e ON ow.assigned_employee = e.user_id
-    WHERE o.status NOT IN ('Cancelled', 'Refunded')
-    ORDER BY ow.started_at IS NULL, ow.started_at ASC, o.order_date ASC
-")->fetchAll();
+// ── Stats ──
+$stats = [];
+$stats['total_active'] = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status NOT IN ('Completed','Cancelled','Refunded')")->fetchColumn();
+$stats['overdue'] = (int)$pdo->query("SELECT COUNT(*) FROM order_workflow ow JOIN orders o ON ow.order_id = o.order_id WHERE ow.expected_completion IS NOT NULL AND ow.expected_completion < NOW() AND o.status NOT IN ('Completed','Cancelled','Refunded')")->fetchColumn();
+$stats['completed_week'] = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(completion_date) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND status = 'Completed'")->fetchColumn();
+$stats['in_qc'] = (int)$pdo->query("SELECT COUNT(*) FROM order_workflow WHERE stage = 'QC'")->fetchColumn();
+$avgLead = $pdo->query("SELECT AVG(TIMESTAMPDIFF(DAY, order_date, COALESCE(completion_date, NOW()))) FROM orders WHERE status = 'Completed'")->fetchColumn();
+$stats['avg_lead'] = $avgLead ? round((float)$avgLead) : '-';
 
-// Calculate date range for timeline
-$minDate = null;
-$maxDate = null;
+// ── Employee load ──
+$empLoad = $pdo->query("SELECT u.user_id, u.full_name, COUNT(*) as cnt FROM order_workflow ow JOIN users u ON ow.assigned_employee = u.user_id JOIN orders o ON ow.order_id = o.order_id WHERE o.status NOT IN ('Completed','Cancelled','Refunded') GROUP BY ow.assigned_employee ORDER BY cnt DESC")->fetchAll();
+$maxEmpLoad = $empLoad ? max(array_column($empLoad, 'cnt')) : 1;
+
+// ── Orders ──
+$orders = $pdo->query("SELECT o.order_id, o.order_date, o.completion_date, o.status, ow.stage, ow.started_at, ow.expected_completion, ow.priority, u.full_name AS customer_name, e.full_name AS employee_name, s.service_name, (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) AS total_qty, (SELECT COUNT(*) FROM order_details WHERE order_id = o.order_id) AS total_items FROM orders o JOIN users u ON o.user_id = u.user_id LEFT JOIN services s ON o.service_id = s.service_id LEFT JOIN order_workflow ow ON o.order_id = ow.order_id LEFT JOIN users e ON ow.assigned_employee = e.user_id WHERE o.status NOT IN ('Cancelled', 'Refunded') ORDER BY ow.started_at IS NULL, ow.started_at ASC, o.order_date ASC")->fetchAll();
+
+// ── Date range for timeline ──
+$minDate = null; $maxDate = null;
 foreach ($orders as $o) {
     $dates = array_filter([$o['order_date'], $o['started_at'], $o['expected_completion'], $o['completion_date']]);
-    foreach ($dates as $d) {
-        $ts = strtotime($d);
-        if ($minDate === null || $ts < $minDate) $minDate = $ts;
-        if ($maxDate === null || $ts > $maxDate) $maxDate = $ts;
-    }
+    foreach ($dates as $d) { $ts = strtotime($d); if ($minDate === null || $ts < $minDate) $minDate = $ts; if ($maxDate === null || $ts > $maxDate) $maxDate = $ts; }
 }
 if (!$minDate) $minDate = time();
 if (!$maxDate) $maxDate = time() + 86400 * 14;
-$minDate = strtotime(date('Y-m-d', $minDate - 86400 * 2)); // 2 days buffer
-$maxDate = strtotime(date('Y-m-d', $maxDate + 86400 * 5));  // 5 days buffer
+$minDate = strtotime(date('Y-m-d', $minDate - 86400 * 2));
+$maxDate = strtotime(date('Y-m-d', $maxDate + 86400 * 5));
 $totalDays = max(1, ceil(($maxDate - $minDate) / 86400));
 $today = time();
 
-// Group by stage
+// ── Group by stage ──
 $grouped = [];
-foreach ($orders as $o) {
-    $s = $o['stage'] ?: 'Unassigned';
-    if (!isset($grouped[$s])) $grouped[$s] = [];
-    $grouped[$s][] = $o;
+foreach ($orders as $o) { $s = $o['stage'] ?: 'Unassigned'; if (!isset($grouped[$s])) $grouped[$s] = []; $grouped[$s][] = $o; }
+
+// ── Overdue alerts ──
+$alertsHtml = '';
+if ($stats['overdue'] > 0) {
+    $alertsHtml = '<div class="dash-alert dash-alert-danger" style="margin:0 24px 16px;display:flex;align-items:center;gap:10px"><i class="fas fa-exclamation-triangle"></i> <span>' . $stats['overdue'] . ' order' . ($stats['overdue']>1?'s are':' is') . ' overdue — review the timeline below.</span></div>';
 }
-$pageTitle = 'Production Schedule';
-?>
-<!DOCTYPE html>
+$stage_order = [
+    STAGE_PENDING_VERIFICATION, STAGE_CUSTOMER_ACTION, STAGE_READY_FOR_PRODUCTION,
+    STAGE_WAITING_MATERIALS, STAGE_MATERIALS_RESERVED, STAGE_CUTTING, STAGE_SEWING,
+    STAGE_EMBROIDERY, STAGE_FINISHING, STAGE_QC, STAGE_REWORK,
+    STAGE_READY_FOR_RELEASE, STAGE_AWAITING_PAYMENT, STAGE_RELEASED,
+];
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Production Schedule — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Production Operations — Sakuragi</title>
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <link rel="stylesheet" href="/public/assets/css/mes.css" />
-<style>
-  body { background: #f5f5f5; }
-  .gantt-container { overflow-x: auto; border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; }
-  .gantt-header { display: flex; border-bottom: 2px solid #e5e7eb; position: sticky; top: 0; background: #fff; z-index: 2; }
-  .gantt-label-col { width: 220px; min-width: 220px; padding: 10px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; border-right: 1px solid #e5e7eb; }
-  .gantt-timeline { flex: 1; display: flex; position: relative; overflow: hidden; }
-  .gantt-day { flex: 1; min-width: 28px; text-align: center; font-size: 9px; color: #9ca3af; padding: 4px 0; border-left: 1px solid #f3f4f6; position: relative; }
-  .gantt-day.weekend { background: #fafafa; }
-  .gantt-day.today { background: #dbeafe; font-weight: 700; color: #2563eb; }
-  .gantt-row { display: flex; border-bottom: 1px solid #f3f4f6; min-height: 44px; }
-  .gantt-row:hover { background: #fafafa; }
-  .gantt-row-label { width: 220px; min-width: 220px; padding: 8px 12px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid #e5e7eb; }
-  .gantt-row-label .order-id { font-size: 13px; font-weight: 600; color: #1f2937; }
-  .gantt-row-label .order-meta { font-size: 10px; color: #6b7280; }
-  .gantt-row-timeline { flex: 1; position: relative; min-height: 44px; }
-  .gantt-bar { position: absolute; height: 22px; border-radius: 4px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; padding: 0 8px; font-size: 9px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: box-shadow .15s; }
-  .gantt-bar:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 5; }
-  .gantt-bar.overdue { border: 2px solid #dc2626; }
-  .gantt-bar.completed { opacity: .6; }
-  .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #dc2626; z-index: 3; pointer-events: none; }
-  .stage-section-header { display: flex; border-bottom: 2px solid #e5e7eb; background: #f9fafb; }
-  .stage-section-header .gantt-label-col { font-weight: 700; font-size: 12px; color: #374151; text-transform: none; }
-  .stage-badge { font-size: 9px; padding: 1px 6px; border-radius: 6px; }
-</style>
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
+  <style id="production-schedule-styles">
+    /* ── Layout ── */
+    .ops-layout { display:flex;gap:24px;padding:0 24px 32px;align-items:flex-start }
+    .ops-main { flex:1;min-width:0 }
+    .ops-sidebar { width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:16px }
+
+    /* ── Timeline ── */
+    .timeline-container { background:var(--bg-primary);border-radius:12px;border:1px solid var(--border-color);overflow:hidden }
+    .timeline-scroll { overflow-x:auto;overflow-y:visible;position:relative }
+    .timeline-header { display:flex;border-bottom:2px solid var(--border-color);position:sticky;top:0;background:var(--bg-primary);z-index:3 }
+    .timeline-label-col { width:280px;min-width:280px;padding:12px 14px;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);border-right:1px solid var(--border-color);display:flex;align-items:center }
+    .timeline-axis { flex:1;display:flex;position:relative;overflow:hidden }
+    .tl-day { flex:1;min-width:32px;text-align:center;font-size:0.65rem;color:var(--text-tertiary);padding:6px 0 4px;border-left:1px solid var(--border-color);line-height:1.2 }
+    .tl-day.weekend { background:var(--bg-secondary) }
+    .tl-day.today { background:rgba(214,40,40,0.06);font-weight:700;color:var(--accent-color) }
+    .tl-day .dow { font-size:0.55rem;opacity:.6;margin-top:1px }
+
+    /* ── Week header ── */
+    .tl-week-header { display:flex;border-bottom:1px solid var(--border-color);background:var(--bg-secondary);position:sticky;top:0;z-index:2 }
+    .tl-week-cell { flex:1;padding:6px 10px;font-size:0.65rem;font-weight:600;color:var(--text-secondary);border-left:1px solid var(--border-color);min-width:160px }
+    .tl-week-cell:first-child { border-left:none }
+
+    /* ── Month header ── */
+    .tl-month-header { display:flex;border-bottom:1px solid var(--border-color);background:var(--bg-secondary);position:sticky;top:0;z-index:2 }
+    .tl-month-cell { flex:1;padding:6px 10px;font-size:0.7rem;font-weight:700;color:var(--text-primary);border-left:1px solid var(--border-color);min-width:200px }
+
+    /* ── Stage group row ── */
+    .stage-group { border-bottom:2px solid var(--border-color) }
+    .stage-group:last-child { border-bottom:none }
+    .stage-row { display:flex }
+    .stage-label { width:280px;min-width:280px;padding:10px 14px;display:flex;align-items:center;gap:8px;border-right:1px solid var(--border-color);background:var(--bg-secondary);font-size:0.78rem;font-weight:600;color:var(--text-primary) }
+    .stage-label .count { font-size:0.65rem;font-weight:400;color:var(--text-tertiary);margin-left:auto }
+    .stage-label .icon { width:20px;text-align:center;font-size:0.85rem }
+
+    /* ── Order card row ── */
+    .order-row { display:flex;border-bottom:1px solid var(--border-color);min-height:84px;transition:background .12s }
+    .order-row:last-child { border-bottom:none }
+    .order-row:hover { background:var(--bg-secondary) }
+    .order-card { width:280px;min-width:280px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px;border-right:1px solid var(--border-color);cursor:pointer }
+    .order-card .top-row { display:flex;align-items:center;gap:8px }
+    .order-card .order-id { font-size:0.82rem;font-weight:700;color:var(--text-primary);text-decoration:none }
+    .order-card .order-id:hover { color:var(--role-accent) }
+    .order-card .priority-badge { font-size:0.55rem;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:3px;letter-spacing:.04em }
+    .priority-badge.urgent { background:rgba(239,68,68,0.12);color:#dc2626 }
+    .priority-badge.high { background:rgba(249,115,22,0.12);color:#ea580c }
+    .priority-badge.medium { background:rgba(234,179,8,0.12);color:#ca8a04 }
+    .priority-badge.low { background:rgba(107,114,128,0.12);color:#6b7280 }
+    .order-card .meta { font-size:0.72rem;color:var(--text-tertiary);display:flex;gap:12px;flex-wrap:wrap;align-items:center }
+    .order-card .meta i { width:14px;text-align:center;font-size:0.65rem;color:var(--text-tertiary) }
+    .order-card .assignee { display:inline-flex;align-items:center;gap:4px }
+    .order-card .avatar { display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--role-accent);color:#fff;font-size:0.55rem;font-weight:700;align-items:center;justify-content:center;flex-shrink:0 }
+    .order-card .qty-badge { font-size:0.65rem;padding:1px 6px;border-radius:4px;background:var(--bg-secondary);color:var(--text-secondary);font-weight:500 }
+
+    /* ── Timeline bar area ── */
+    .order-timeline { flex:1;position:relative;min-height:84px }
+    .gantt-bar { position:absolute;height:28px;border-radius:6px;top:50%;transform:translateY(-50%);display:flex;align-items:center;padding:0 10px;font-size:0.65rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.12);transition:box-shadow .15s,transform .12s;z-index:1 }
+    .gantt-bar:hover { box-shadow:0 3px 12px rgba(0,0,0,0.18);transform:translateY(-50%) scaleY(1.08);z-index:5 }
+    .gantt-bar.completed { opacity:.55 }
+    .gantt-bar.overdue { box-shadow:0 0 0 2px #dc2626 }
+    .today-line { position:absolute;top:0;bottom:0;width:2px;background:var(--accent-color);z-index:2;pointer-events:none;opacity:.6 }
+    .today-line::before { content:'Today';position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:0.55rem;font-weight:700;color:var(--accent-color);white-space:nowrap }
+
+    /* ── Employee capacity ── */
+    .emp-card { background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px }
+    .emp-card h3 { font-size:0.82rem;font-weight:700;color:var(--text-primary);margin:0 0 12px;display:flex;align-items:center;gap:6px }
+    .emp-item { display:flex;align-items:center;gap:10px;padding:6px 0;font-size:0.78rem }
+    .emp-item .avatar { width:24px;height:24px;border-radius:50%;background:var(--role-accent);color:#fff;font-size:0.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0 }
+    .emp-item .emp-bar-wrap { flex:1;height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden }
+    .emp-item .emp-bar-fill { height:100%;border-radius:3px;background:var(--role-accent);transition:width .4s }
+    .emp-item .emp-count { font-size:0.65rem;font-weight:600;color:var(--text-secondary);min-width:24px;text-align:right }
+
+    /* ── Zoom controls ── */
+    .zoom-bar { display:flex;gap:4px;margin-bottom:16px }
+    .zoom-btn { padding:5px 14px;font-size:0.72rem;font-weight:600;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);color:var(--text-secondary);cursor:pointer;transition:all .12s }
+    .zoom-btn:hover { border-color:var(--role-accent);color:var(--role-accent) }
+    .zoom-btn.active { background:var(--role-accent);color:#fff;border-color:var(--role-accent) }
+
+    /* ── Empty stage ── */
+    .stage-empty { display:flex;border-bottom:1px solid var(--border-color);min-height:60px }
+    .stage-empty .empty-msg { width:280px;min-width:280px;padding:16px 14px;font-size:0.72rem;color:var(--text-tertiary);border-right:1px solid var(--border-color);display:flex;align-items:center;justify-content:center }
+
+    /* ── Stage dot legend (in sidebar) ── */
+    .legend-card { background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px }
+    .legend-card h3 { font-size:0.82rem;font-weight:700;color:var(--text-primary);margin:0 0 10px;display:flex;align-items:center;gap:6px }
+    .legend-item { display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.7rem;color:var(--text-secondary) }
+    .legend-dot { width:10px;height:10px;border-radius:3px;flex-shrink:0 }
+
+    /* ── KPI row override for tighter spacing ── */
+    .ops-kpi { margin-bottom:16px }
+  </style>
 </head>
-<body>
+<body data-role="admin">
 <div class="dash-layout">
   <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-      <h1 style="font-size:20px;font-weight:700;margin:0">Production Schedule</h1>
-      <p style="font-size:13px;color:#6b7280;margin-top:4px">Timeline view of all active orders by production stage</p>
-    </div>
-    <div style="display:flex;gap:12px;font-size:11px;align-items:center">
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#3b82f6;margin-right:4px;vertical-align:middle"></span>In Progress</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#10b981;margin-right:4px;vertical-align:middle"></span>Completed</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>Not Started</span>
-      <span><span style="display:inline-block;width:12px;height:12px;border:2px solid #dc2626;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Overdue</span>
-    </div>
-  </div>
+<?php
+$kpiRow = '<div class="ops-kpi">' . renderKPIRow([
+  ['label' => 'Active Orders', 'value' => (string)$stats['total_active'], 'icon' => 'fas fa-tasks', 'accent' => 'blue'],
+  ['label' => 'Overdue', 'value' => (string)$stats['overdue'], 'icon' => 'fas fa-exclamation-triangle', 'accent' => 'red'],
+  ['label' => 'Completed (7d)', 'value' => (string)$stats['completed_week'], 'icon' => 'fas fa-check-circle', 'accent' => 'green'],
+  ['label' => 'In QC', 'value' => (string)$stats['in_qc'], 'icon' => 'fas fa-search', 'accent' => 'amber'],
+  ['label' => 'Avg. Lead Time', 'value' => (string)$stats['avg_lead'] . 'd', 'icon' => 'fas fa-clock', 'accent' => 'purple'],
+]) . '</div>';
 
-  <div class="gantt-container">
-    <!-- Timeline Header -->
-    <div class="gantt-header">
-      <div class="gantt-label-col">Order</div>
-      <div class="gantt-timeline">
-        <?php for ($i = 0; $i < $totalDays; $i++):
-          $day = $minDate + $i * 86400;
-          $isWeekend = in_array(date('w', $day), [0, 6]);
-          $isToday = date('Y-m-d', $day) === date('Y-m-d');
-        ?>
-        <div class="gantt-day <?= $isWeekend ? 'weekend' : '' ?> <?= $isToday ? 'today' : '' ?>">
-          <?= date('d', $day) ?>
-          <div style="font-size:7px"><?= date('D', $day) ?></div>
-        </div>
-        <?php endfor; ?>
-        <!-- Today line -->
-        <?php $todayOffset = floor((strtotime(date('Y-m-d')) - $minDate) / 86400); ?>
+// ── Build timeline ──
+ob_start(); ?>
+<div class="timeline-container">
+  <div class="timeline-scroll" id="timelineScroll">
+    <?php
+    // Render date header (day mode — default visible)
+    $headerCells = '';
+    for ($i = 0; $i < $totalDays; $i++):
+      $day = $minDate + $i * 86400;
+      $isWeekend = in_array(date('w', $day), [0, 6]);
+      $isToday = date('Y-m-d', $day) === date('Y-m-d');
+      $headerCells .= '<div class="tl-day' . ($isWeekend ? ' weekend' : '') . ($isToday ? ' today' : '') . '" data-col="d-' . $i . '">' . date('d', $day) . '<div class="dow">' . date('D', $day) . '</div></div>';
+    endfor;
+    $todayOffset = floor((strtotime(date('Y-m-d')) - $minDate) / 86400);
+
+    // Render week headers
+    $weekCells = '';
+    $weekStart = $minDate;
+    while ($weekStart < $maxDate):
+      $weekEnd = min($weekStart + 86400 * 6, $maxDate);
+      $weekLabel = date('M d', $weekStart) . ' — ' . date('M d', $weekEnd);
+      $colStart = floor(($weekStart - $minDate) / 86400);
+      $colSpan = ceil(($weekEnd - $weekStart) / 86400) + 1;
+      $weekCells .= '<div class="tl-week-cell" style="flex:' . $colSpan . ';min-width:' . ($colSpan * 32) . 'px" data-col-start="' . $colStart . '" data-col-span="' . $colSpan . '">' . $weekLabel . '</div>';
+      $weekStart = $weekEnd + 86400;
+    endwhile;
+
+    // Render month headers
+    $monthCells = '';
+    $monthStart = $minDate;
+    while ($monthStart < $maxDate):
+      $monthEnd = min(strtotime(date('Y-m-t', $monthStart)), $maxDate);
+      $monthLabel = date('F Y', $monthStart);
+      $colStart = floor(($monthStart - $minDate) / 86400);
+      $colSpan = ceil(($monthEnd - $monthStart) / 86400) + 1;
+      $monthCells .= '<div class="tl-month-cell" style="flex:' . $colSpan . ';min-width:' . ($colSpan * 32) . 'px" data-col-start="' . $colStart . '" data-col-span="' . $colSpan . '">' . $monthLabel . '</div>';
+      $monthStart = $monthEnd + 86400;
+    endwhile;
+    ?>
+
+    <div class="timeline-header">
+      <div class="timeline-label-col">Order</div>
+      <div class="timeline-axis">
+        <?= $headerCells ?>
         <?php if ($todayOffset >= 0 && $todayOffset < $totalDays): ?>
         <div class="today-line" style="left:<?= ($todayOffset / $totalDays) * 100 ?>%"></div>
         <?php endif; ?>
       </div>
     </div>
 
-    <!-- Rows by Stage -->
-    <?php foreach ($grouped as $stage => $stageOrders):
-      $cfg = $STAGE_CONFIG[$stage] ?? ['color' => '#6b7280', 'icon' => 'fas fa-circle'];
+    <?php foreach ($stage_order as $stg):
+      $cfg = $STAGE_CONFIG[$stg] ?? ['label' => $stg, 'color' => '#6b7280', 'icon' => 'fas fa-circle'];
+      $ordersInStage = $grouped[$stg] ?? [];
     ?>
-    <div class="stage-section-header">
-      <div class="gantt-label-col" style="color:<?= $cfg['color'] ?>">
-        <i class="<?= $cfg['icon'] ?> me-1"></i><?= htmlspecialchars($cfg['label'] ?? $stage) ?>
-        <span style="color:#9ca3ab;font-weight:400">(<?= count($stageOrders) ?>)</span>
+    <div class="stage-group" data-stage="<?= htmlspecialchars($stg) ?>">
+      <div class="stage-row">
+        <div class="stage-label" style="color:<?= $cfg['color'] ?>">
+          <span class="icon"><i class="<?= $cfg['icon'] ?>"></i></span>
+          <?= htmlspecialchars($cfg['label'] ?? $stg) ?>
+          <span class="count"><?= count($ordersInStage) ?> order<?= count($ordersInStage) !== 1 ? 's' : '' ?></span>
+        </div>
+        <div class="order-timeline" style="background:repeating-linear-gradient(90deg,var(--border-color) 0,var(--border-color) 1px,transparent 1px,transparent <?= 100/$totalDays ?>%)"></div>
       </div>
-      <div class="gantt-timeline"></div>
-    </div>
 
-    <?php foreach ($stageOrders as $o):
-      $start = $o['started_at'] ? strtotime($o['started_at']) : strtotime($o['order_date']);
-      $end = $o['expected_completion'] ? strtotime($o['expected_completion']) : ($start + 86400 * 7);
-      if ($end < $start) $end = $start + 86400;
-      if ($o['status'] === 'Completed' && $o['completion_date']) $end = strtotime($o['completion_date']);
-
-      $leftPct = max(0, (($start - $minDate) / ($maxDate - $minDate)) * 100);
-      $widthPct = min(100 - $leftPct, max(2, (($end - $start) / ($maxDate - $minDate)) * 100));
-
-      $isCompleted = $o['status'] === 'Completed';
-      $isOverdue = !$isCompleted && $o['expected_completion'] && strtotime($o['expected_completion']) < $today;
-      $barColor = $isCompleted ? '#10b981' : ($isOverdue ? '#ef4444' : (in_array($o['stage'], [STAGE_ORDER_RECEIVED, STAGE_DESIGN_REVIEW]) ? '#f59e0b' : '#3b82f6'));
-
-      $empName = $o['employee_name'] ?? 'Unassigned';
-    ?>
-    <div class="gantt-row">
-      <div class="gantt-row-label">
-        <span class="order-id">#ORD-<?= $o['order_id'] ?></span>
-        <span class="order-meta"><?= htmlspecialchars($o['customer_name']) ?> · <?= $o['total_qty'] ?? 0 ?> pcs · <?= htmlspecialchars($empName) ?></span>
+      <?php if (empty($ordersInStage)): ?>
+      <div class="stage-empty">
+        <div class="empty-msg"><span style="opacity:.5">No orders in this stage</span></div>
+        <div class="order-timeline"></div>
       </div>
-      <div class="gantt-row-timeline">
-        <div class="gantt-bar <?= $isOverdue ? 'overdue' : '' ?> <?= $isCompleted ? 'completed' : '' ?>"
-             style="left:<?= $leftPct ?>%;width:<?= $widthPct ?>%;background:<?= $barColor ?>"
-             title="#ORD-<?= $o['order_id'] ?>: <?= date('M d', $start) ?> - <?= date('M d', $end) ?>">
-          #<?= $o['order_id'] ?>
+      <?php else: foreach ($ordersInStage as $o):
+        $start = $o['started_at'] ? strtotime($o['started_at']) : strtotime($o['order_date']);
+        $end = $o['expected_completion'] ? strtotime($o['expected_completion']) : ($start + 86400 * 7);
+        if ($end < $start) $end = $start + 86400;
+        if ($o['status'] === 'Completed' && $o['completion_date']) $end = strtotime($o['completion_date']);
+        $leftPct = max(0, (($start - $minDate) / ($maxDate - $minDate)) * 100);
+        $widthPct = min(100 - $leftPct, max(1.5, (($end - $start) / ($maxDate - $minDate)) * 100));
+        $isCompleted = $o['status'] === 'Completed';
+        $isOverdue = !$isCompleted && $o['expected_completion'] && strtotime($o['expected_completion']) < $today;
+        $barColor = $isCompleted ? '#10b981' : ($isOverdue ? '#ef4444' : $cfg['color']);
+        $empName = $o['employee_name'] ?? '';
+        $empInitial = $empName ? substr($empName, 0, 1) : '?';
+        $priority = $o['priority'] ?? 'normal';
+        $qty = $o['total_qty'] ?? 0;
+        $dueDate = $o['expected_completion'] ? date('M d', strtotime($o['expected_completion'])) : '—';
+      ?>
+      <div class="order-row" data-order="<?= $o['order_id'] ?>">
+        <div class="order-card">
+          <div class="top-row">
+            <a href="view_order.php?id=<?= $o['order_id'] ?>" class="order-id">#ORD-<?= $o['order_id'] ?></a>
+            <?php if (strtolower($priority) === 'urgent'): ?>
+            <span class="priority-badge urgent">Urgent</span>
+            <?php elseif (strtolower($priority) === 'high'): ?>
+            <span class="priority-badge high">High</span>
+            <?php elseif (strtolower($priority) === 'medium'): ?>
+            <span class="priority-badge medium">Medium</span>
+            <?php elseif (strtolower($priority) === 'low'): ?>
+            <span class="priority-badge low">Low</span>
+            <?php endif; ?>
+          </div>
+          <div class="meta">
+            <span><i class="fas fa-user"></i> <?= htmlspecialchars($o['customer_name']) ?></span>
+            <?php if ($qty > 0): ?>
+            <span class="qty-badge"><?= $qty ?> pc<?= $qty !== 1 ? 's' : '' ?></span>
+            <?php endif; ?>
+            <span><i class="fas fa-calendar"></i> Due <?= $dueDate ?></span>
+            <?php if ($empName): ?>
+            <span class="assignee"><span class="avatar"><?= htmlspecialchars($empInitial) ?></span> <?= htmlspecialchars($empName) ?></span>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div class="order-timeline">
+          <div class="gantt-bar <?= $isOverdue ? 'overdue' : '' ?> <?= $isCompleted ? 'completed' : '' ?>"
+               style="left:<?= $leftPct ?>%;width:<?= $widthPct ?>%;background:<?= $barColor ?>"
+               title="#ORD-<?= $o['order_id'] ?>: <?= date('M d', $start) ?> – <?= date('M d', $end) ?>">
+            #<?= $o['order_id'] ?>
+          </div>
+          <?php if ($todayOffset >= 0 && $todayOffset < $totalDays): ?>
+          <div class="today-line" style="left:<?= ($todayOffset / $totalDays) * 100 ?>%"></div>
+          <?php endif; ?>
         </div>
       </div>
+      <?php endforeach; endif; ?>
     </div>
     <?php endforeach; ?>
-    <?php endforeach; ?>
   </div>
 </div>
+<?php $timelineHtml = ob_get_clean();
 
-  </div>
-</div>
+// ── Employee capacity sidebar ──
+$empHtml = '<div class="emp-card"><h3><i class="fas fa-users" style="color:var(--role-accent)"></i> Employee Capacity</h3>';
+if (empty($empLoad)):
+  $empHtml .= '<p style="font-size:0.75rem;color:var(--text-tertiary);text-align:center;padding:12px 0;margin:0">No active assignments</p>';
+else:
+  foreach ($empLoad as $e):
+    $pct = round(($e['cnt'] / $maxEmpLoad) * 100);
+    $initial = substr($e['full_name'], 0, 1);
+    $empHtml .= '<div class="emp-item"><span class="avatar">' . htmlspecialchars($initial) . '</span><span style="flex:1;font-size:0.72rem;color:var(--text-primary)">' . htmlspecialchars($e['full_name']) . '</span><div class="emp-bar-wrap"><div class="emp-bar-fill" style="width:' . $pct . '%"></div></div><span class="emp-count">' . $e['cnt'] . '</span></div>';
+  endforeach;
+endif;
+$empHtml .= '</div>';
 
-<script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
+// ── Legend sidebar ──
+$legendHtml = '<div class="legend-card"><h3><i class="fas fa-palette" style="color:var(--role-accent)"></i> Stage Colors</h3>';
+foreach ($stage_order as $stg):
+  $cfg = $STAGE_CONFIG[$stg] ?? ['label' => $stg, 'color' => '#6b7280'];
+  $legendHtml .= '<div class="legend-item"><span class="legend-dot" style="background:' . $cfg['color'] . '"></span>' . htmlspecialchars($cfg['label'] ?? $stg) . '</div>';
+endforeach;
+$legendHtml .= '</div>';
+
+// ── Combine ──
+$zoomBar = '<div class="zoom-bar" id="zoomBar"><button class="zoom-btn active" data-zoom="day">Day</button><button class="zoom-btn" data-zoom="week">Week</button><button class="zoom-btn" data-zoom="month">Month</button></div>';
+
+$workspace = $alertsHtml . '<div class="ops-layout"><div class="ops-main">' . $zoomBar . $timelineHtml . '</div><div class="ops-sidebar">' . $empHtml . $legendHtml . '</div></div>'
+  . '<script>
+document.addEventListener(\'DOMContentLoaded\', function() {
+  var zoomBtns = document.querySelectorAll(\'.zoom-btn\');
+  var headerCells = document.querySelectorAll(\'.tl-day\');
+  var weekCells = document.querySelectorAll(\'.tl-week-cell\');
+  var monthCells = document.querySelectorAll(\'.tl-month-cell\');
+  zoomBtns.forEach(function(btn) {
+    btn.addEventListener(\'click\', function() {
+      zoomBtns.forEach(function(b) { b.classList.remove(\'active\'); });
+      this.classList.add(\'active\');
+      var zoom = this.getAttribute(\'data-zoom\');
+      headerCells.forEach(function(c) { c.style.display = zoom === \'day\' ? \'\' : \'none\'; });
+      weekCells.forEach(function(c) { c.style.display = zoom === \'week\' ? \'\' : \'none\'; });
+      monthCells.forEach(function(c) { c.style.display = zoom === \'month\' ? \'\' : \'none\'; });
+    });
+  });
+  weekCells.forEach(function(c) { c.style.display = \'none\'; });
+  monthCells.forEach(function(c) { c.style.display = \'none\'; });
 });
-</script>
-</body>
-</html>
+</script>';
+
+echo renderDashboardShell(
+  renderPageHeader('Production Operations', 'Timeline workspace for all active production orders.', '', [
+    ['label' => 'Board', 'href' => 'production_board.php', 'icon' => 'fas fa-columns', 'variant' => 'outline', 'size' => 'sm'],
+    ['label' => 'Analytics', 'href' => 'production_analytics.php', 'icon' => 'fas fa-chart-bar', 'variant' => 'outline', 'size' => 'sm'],
+    ['label' => 'QC', 'href' => 'quality_control.php', 'icon' => 'fas fa-search', 'variant' => 'outline', 'size' => 'sm'],
+  ]),
+  $kpiRow,
+  $workspace
+);
+?>

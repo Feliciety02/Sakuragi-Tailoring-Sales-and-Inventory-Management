@@ -28,11 +28,15 @@ class OrderRepository
                 s.service_name,
                 s.service_category,
                 COALESCE(u.full_name, 'Unassigned') as employee_name,
-                COALESCE(SUM(od.quantity), 0) as total_quantity
+                COALESCE(SUM(od.quantity), 0) as total_quantity,
+                ow.stage,
+                ow.sample_status,
+                ow.priority
             FROM orders o
             JOIN services s ON o.service_id = s.service_id
             LEFT JOIN users u ON o.employee_id = u.user_id
             LEFT JOIN order_details od ON o.order_id = od.order_id
+            LEFT JOIN order_workflow ow ON o.order_id = ow.order_id
             WHERE o.user_id = :user_id
             GROUP BY o.order_id
             ORDER BY o.order_date DESC

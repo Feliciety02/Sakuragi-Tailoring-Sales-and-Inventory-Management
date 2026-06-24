@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/role_admin_only.php';
-
 
 $monthlyReports = $pdo->query("
     SELECT
@@ -21,93 +21,63 @@ $monthlyReports = $pdo->query("
 $totalSales = $pdo->query("SELECT SUM(total_price) FROM orders WHERE status = 'Completed'")->fetchColumn() ?: 0;
 $totalOrders = $pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $pendingOrders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Pending'")->fetchColumn();
+
 $pageTitle = 'Reports & Analytics';
-?>
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reports & Analytics — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
 </head>
-<body>
+<body data-role="admin">
 <div class="dash-layout">
   <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-    <h1>Reports & Analytics</h1>
+<?php
+$metricsRow = renderKPIRow([
+  ['label' => 'Total Sales', 'value' => '₱' . number_format($totalSales, 2), 'icon' => 'fas fa-dollar-sign', 'accent' => 'red'],
+  ['label' => 'Total Orders', 'value' => (string)$totalOrders, 'icon' => 'fas fa-shopping-cart', 'accent' => 'blue'],
+  ['label' => 'Pending', 'value' => (string)$pendingOrders, 'icon' => 'fas fa-clock', 'accent' => 'amber'],
+]);
 
-    <div class="summary-cards" style="display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap;">
-        <div style="flex:1;min-width:150px;background:#007bff;color:white;padding:1rem;border-radius:10px;text-align:center;">
-            <h3 style="margin:0;font-size:0.9rem;">Total Sales</h3>
-            <p style="margin:0;font-size:1.5rem;font-weight:bold;">₱<?= number_format($totalSales, 2) ?></p>
-        </div>
-        <div style="flex:1;min-width:150px;background:#28a745;color:white;padding:1rem;border-radius:10px;text-align:center;">
-            <h3 style="margin:0;font-size:0.9rem;">Total Orders</h3>
-            <p style="margin:0;font-size:1.5rem;font-weight:bold;"><?= $totalOrders ?></p>
-        </div>
-        <div style="flex:1;min-width:150px;background:#ffc107;color:#212529;padding:1rem;border-radius:10px;text-align:center;">
-            <h3 style="margin:0;font-size:0.9rem;">Pending</h3>
-            <p style="margin:0;font-size:1.5rem;font-weight:bold;"><?= $pendingOrders ?></p>
-        </div>
-    </div>
+if (empty($monthlyReports)):
+  $tableContent = renderEmptyState('fas fa-chart-bar', 'No data yet', 'Monthly reports will appear here once orders are placed.');
+else:
+  $cols = [
+    ['field' => 'month', 'label' => 'Month'],
+    ['field' => 'sales', 'label' => 'Total Sales'],
+    ['field' => 'orders', 'label' => 'Orders'],
+    ['field' => 'completed', 'label' => 'Completed'],
+  ];
+  $data = [];
+  foreach ($monthlyReports as $r):
+    $data[] = [
+      'month' => htmlspecialchars($r['month_label']),
+      'sales' => '₱' . number_format($r['total_sales'], 2),
+      'orders' => (string)$r['total_orders'],
+      'completed' => (string)$r['completed_orders'],
+    ];
+  endforeach;
+  $tableContent = renderDataTable('reports-table', $cols, $data, ['searchable' => true, 'searchPlaceholder' => 'Search reports...', 'actions' => [['label' => 'Export CSV', 'icon' => 'fas fa-download', 'href' => '#', 'variant' => 'outline', 'onclick' => "exportTableToCSV('reports-table', 'monthly_reports.csv');return false"]]]);
+endif;
 
-    <div class="table-controls">
-        <div class="filters">
-            <div class="input-wrapper">
-                <i class="fas fa-search"></i>
-                <input type="text" id="reportSearch" placeholder="Search reports..." class="table-search"
-                    onkeyup="filterTableBySearch('reportSearch', 'reportsTable')">
-            </div>
-        </div>
-
-        <button onclick="exportTableToCSV('reportsTable', 'monthly_reports.csv')" class="btn-export">
-            <i class="fas fa-download"></i> Export CSV
-        </button>
-    </div>
-
-    <div class="table-responsive">
-        <table id="reportsTable">
-            <thead>
-                <tr>
-                    <th onclick="sortTableByColumn('reportsTable', 0)">Month</th>
-                    <th onclick="sortTableByColumn('reportsTable', 1)">Total Sales</th>
-                    <th onclick="sortTableByColumn('reportsTable', 2)">Orders</th>
-                    <th onclick="sortTableByColumn('reportsTable', 3)">Completed</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($monthlyReports)): ?>
-                    <tr><td colspan="4" class="text-center">No data yet.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($monthlyReports as $report): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($report['month_label']) ?></td>
-                        <td>₱<?= number_format($report['total_sales'], 2) ?></td>
-                        <td><?= $report['total_orders'] ?></td>
-                        <td><?= $report['completed_orders'] ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<script src="/public/assets/js/tables.js"></script>
-
-  </div>
-</div>
-
+$tableContent .= '<script src="/public/assets/js/tables.js"></script>
 <script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
+document.getElementById(\'menuToggle\')?.addEventListener(\'click\', function() {
+  document.getElementById(\'sidebar\')?.classList.toggle(\'collapsed\');
 });
-</script>
-</body>
-</html>
+</script>';
+
+echo renderDashboardShell(
+  renderPageHeader('Reports & Analytics', 'Monthly sales, orders, and performance data.'),
+  $metricsRow,
+  $tableContent
+);

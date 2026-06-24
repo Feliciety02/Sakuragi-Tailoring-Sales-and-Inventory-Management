@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/constants.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
 
 if (get_user_role() === ROLE_ADMIN || get_user_role() === ROLE_MANAGER || get_user_role() === ROLE_EMPLOYEE) {
@@ -11,13 +12,16 @@ if (get_user_role() === ROLE_ADMIN || get_user_role() === ROLE_MANAGER || get_us
 
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Customer';
+$firstName = htmlspecialchars(explode(' ', $full_name)[0]);
 
 // KPIs
 $totalOrders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE user_id = ?");
 $totalOrders->execute([$user_id]);
+$totalOrdersVal = (int)$totalOrders->fetchColumn();
 
 $activeOrders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE user_id = ? AND status IN ('Pending','In Progress')");
 $activeOrders->execute([$user_id]);
+$activeOrdersVal = (int)$activeOrders->fetchColumn();
 
 $pendingSample = $pdo->prepare("
     SELECT COUNT(*) FROM sample_approvals sa
@@ -25,6 +29,7 @@ $pendingSample = $pdo->prepare("
     WHERE o.user_id = ? AND sa.status = 'pending'
 ");
 $pendingSample->execute([$user_id]);
+$pendingSampleVal = (int)$pendingSample->fetchColumn();
 
 $readyPickup = $pdo->prepare("
     SELECT COUNT(*) FROM orders o
@@ -32,10 +37,20 @@ $readyPickup = $pdo->prepare("
     WHERE o.user_id = ? AND ow.stage = ?
 ");
 $readyPickup->execute([$user_id, STAGE_READY_PICKUP]);
+$readyPickupVal = (int)$readyPickup->fetchColumn();
 
 $completedOrders = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE user_id = ? AND status = 'Completed'");
 $completedOrders->execute([$user_id]);
+$completedOrdersVal = (int)$completedOrders->fetchColumn();
 
+// Loyalty rewards
+$totalItems = $pdo->prepare("SELECT COALESCE(SUM(od.quantity), 0) FROM order_details od JOIN orders o ON od.order_id = o.order_id WHERE o.user_id = ?");
+$totalItems->execute([$user_id]);
+$totalItemsPurchased = (int)$totalItems->fetchColumn();
+$freeShirtsEarned = floor($totalItemsPurchased / 12);
+$freeShirtsClaimed = 0; // Could be fetched from a rewards table
+
+// Recent orders
 $recentOrders = $pdo->prepare("
     SELECT o.*, ow.stage, ow.priority, ow.expected_completion,
            s.service_name,
@@ -48,7 +63,18 @@ $recentOrders = $pdo->prepare("
     LIMIT 10
 ");
 $recentOrders->execute([$user_id]);
+$recentOrdersList = $recentOrders->fetchAll();
 
+// Current active order (first active one for timeline)
+$currentOrder = null;
+foreach ($recentOrdersList as $o) {
+    if (in_array($o['status'], ['Pending', 'In Progress'])) {
+        $currentOrder = $o;
+        break;
+    }
+}
+
+// Pending sample approvals
 $pendingSampleOrders = $pdo->prepare("
     SELECT o.order_id, o.order_date, sa.submitted_at, sa.approval_id, sa.status AS sample_status,
            s.service_name,
@@ -60,143 +86,186 @@ $pendingSampleOrders = $pdo->prepare("
     ORDER BY sa.submitted_at DESC
 ");
 $pendingSampleOrders->execute([$user_id]);
+$pendingSamples = $pendingSampleOrders->fetchAll();
+
 $pageTitle = 'My Dashboard';
-?>
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Dashboard — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <style>
-    .kpi-icon-cust { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
-    .order-card-cust { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.25rem; background: var(--surface); transition: box-shadow 0.2s; }
-    .order-card-cust:hover { box-shadow: var(--shadow-md); }
-  </style>
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
 </head>
-<body>
+<body data-role="customer">
 <div class="dash-layout">
   <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-      <div class="page-header">
-        <h1>My Dashboard</h1>
-        <p>Track your bulk orders and sample approvals, <?= htmlspecialchars(explode(' ', $full_name)[0]) ?></p>
+<?php
+// ── Build order timeline HTML for current order ──
+$timelineHtml = '';
+if ($currentOrder):
+  $timelineStages = [
+    ['key' => 'Order Confirmed',      'icon' => 'fas fa-check',         'desc' => 'Order placed'],
+    ['key' => 'In Production',        'icon' => 'fas fa-cog',          'desc' => 'Being crafted'],
+    ['key' => 'Quality Check',        'icon' => 'fas fa-search',       'desc' => 'QC review'],
+    ['key' => 'Ready for Pickup',     'icon' => 'fas fa-box-open',     'desc' => 'Ready to collect'],
+    ['key' => 'Completed',            'icon' => 'fas fa-flag-checkered','desc' => 'Delivered'],
+  ];
+  $currentCs = $CUSTOMER_STAGE_MAP[$currentOrder['stage']] ?? 'Processing';
+  $foundCurrent = false;
+
+  ob_start();
+?>
+<div class="task-card" style="margin-bottom:24px;overflow:hidden">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:0.75rem;color:var(--text-tertiary);font-weight:500;margin-bottom:2px">Current Order</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary)">#ORD-<?= $currentOrder['order_id'] ?></div>
+    </div>
+    <?= renderStatusBadge(htmlspecialchars($currentCs), 'accent') ?>
+  </div>
+  <div class="timeline">
+    <?php foreach ($timelineStages as $ts):
+      $isActive = ($ts['key'] === $currentCs);
+      $isPast = false;
+      if (!$foundCurrent && !$isActive) {
+        $isPast = true;
+      } elseif ($isActive) {
+        $foundCurrent = true;
+      }
+      $dotClass = $isActive ? 'is-active' : ($isPast ? 'is-complete' : 'is-pending');
+      $titleClass = (!$isPast && !$isActive) ? 'is-pending' : '';
+    ?>
+    <div class="timeline-item">
+      <div class="timeline-dot <?= $dotClass ?>"><i class="<?= $ts['icon'] ?>" style="font-size:0.65rem"></i></div>
+      <div class="timeline-content">
+        <div class="timeline-title <?= $titleClass ?>"><?= htmlspecialchars($ts['key']) ?></div>
+        <div class="timeline-subtitle"><?= htmlspecialchars($ts['desc']) ?></div>
       </div>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php
+  $timelineHtml = ob_get_clean();
+endif;
 
-      <!-- KPI Cards -->
-      <div class="kpi-row">
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#dbeafe;color:#2563eb"><i class="fas fa-shopping-bag"></i></div>
-          <div class="kpi-label">Total Orders</div>
-          <div class="kpi-value"><?= $totalOrders->fetchColumn() ?></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-spinner"></i></div>
-          <div class="kpi-label">Active</div>
-          <div class="kpi-value"><?= $activeOrders->fetchColumn() ?></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f3e8ff;color:#7c3aed"><i class="fas fa-flask"></i></div>
-          <div class="kpi-label">Pending Sample</div>
-          <div class="kpi-value"><?= $pendingSample->fetchColumn() ?></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#d1fae5;color:#059669"><i class="fas fa-check-circle"></i></div>
-          <div class="kpi-label">Completed</div>
-          <div class="kpi-value"><?= $completedOrders->fetchColumn() ?></div>
-        </div>
-      </div>
+// ── Build recent orders HTML ──
+$recentOrdersHtml = '';
+if (empty($recentOrdersList)):
+  $recentOrdersHtml = renderEmptyState('fas fa-inbox', 'No orders yet', 'Place your first bulk order to get started.',
+    ['label' => 'Place Your First Order', 'href' => 'place_order.php', 'icon' => 'fas fa-plus']);
+else:
+  ob_start();
+  foreach ($recentOrdersList as $o):
+    $cs = $CUSTOMER_STAGE_MAP[$o['stage']] ?? 'Processing';
+    $pct = getStageProgress($o['stage']);
+    $stageColor = $STAGE_CONFIG[$o['stage']]['color'] ?? '#6b7280';
+?>
+<a href="view_order.php?id=<?= $o['order_id'] ?>" style="text-decoration:none;display:block;margin-bottom:12px">
+  <div class="task-card">
+    <div class="task-card-header">
+      <span class="task-card-title">#ORD-<?= $o['order_id'] ?></span>
+      <?= renderStatusBadge(htmlspecialchars($cs), 'accent') ?>
+    </div>
+    <div class="task-card-meta">
+      <?= htmlspecialchars($o['service_name']) ?> · Qty: <?= (int)$o['total_qty'] ?> · <?= date('M j, Y', strtotime($o['order_date'])) ?>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= $pct ?>%"></div></div>
+      <span class="progress-bar-label"><?= $pct ?>%</span>
+    </div>
+  </div>
+</a>
+<?php
+  endforeach;
+  $recentOrdersHtml = ob_get_clean();
+endif;
 
-      <div class="dash-two-col">
-        <!-- Recent Orders -->
-        <div>
-          <div class="section-header" style="margin-bottom:16px">
-            <h2><i class="fas fa-folder-open" style="margin-right:8px;color:var(--accent-blue)"></i>Recent Orders</h2>
-            <a href="my_orders.php" class="dash-btn dash-btn-outline dash-btn-sm"><i class="fas fa-external-link-alt"></i> View All</a>
-          </div>
+// ── Build sample approvals sidebar ──
+$samplesHtml = '';
+if (empty($pendingSamples)):
+  $samplesHtml = '<div class="empty-state" style="border:none;padding:8px 0">No pending sample reviews.</div>';
+else:
+  ob_start();
+  foreach ($pendingSamples as $s):
+?>
+<div class="activity-item">
+  <span class="activity-dot" style="background:#7c3aed"></span>
+  <div class="activity-content" style="font-size:0.82rem">
+    <strong>#ORD-<?= $s['order_id'] ?></strong> — <?= htmlspecialchars($s['service_name']) ?> · <?= (int)$s['total_qty'] ?> pcs
+    <div class="activity-time">Submitted <?= date('M j', strtotime($s['submitted_at'])) ?></div>
+  </div>
+  <a href="sample_review.php" class="dash-btn dash-btn-primary dash-btn-sm flex-shrink-0">Review</a>
+</div>
+<?php
+  endforeach;
+  $samplesHtml = ob_get_clean();
+endif;
 
-          <?php if ($recentOrders->rowCount() === 0): ?>
-            <div class="panel-card" style="text-align:center;padding:32px">
-              <i class="fas fa-inbox fa-2x" style="color:var(--text-tertiary);margin-bottom:12px"></i>
-              <p style="color:var(--text-secondary)">No orders yet. <a href="place_order.php" style="color:var(--accent-blue);font-weight:600">Place your first order</a></p>
-            </div>
-          <?php else: ?>
-            <?php foreach ($recentOrders as $o):
-              $cs = $CUSTOMER_STAGE_MAP[$o['stage']] ?? 'Processing';
-              $pct = getStageProgress($o['stage']);
-              $stageColor = $STAGE_CONFIG[$o['stage']]['color'] ?? '#6b7280';
-            ?>
-            <a href="view_order.php?id=<?= $o['order_id'] ?>" class="text-decoration-none">
-              <div class="task-card" style="margin-bottom:12px">
-                <div class="task-header">
-                  <span class="task-id">#ORD-<?= $o['order_id'] ?></span>
-                  <span style="font-size:.7rem;padding:2px 10px;border-radius:100px;background:<?= $stageColor ?>20;color:<?= $stageColor ?>;font-weight:600"><?= htmlspecialchars($cs) ?></span>
-                </div>
-                <div class="task-meta"><?= htmlspecialchars($o['service_name']) ?> · Qty: <?= (int)$o['total_qty'] ?> · <?= date('M j, Y', strtotime($o['order_date'])) ?></div>
-                <div class="task-progress">
-                  <div class="bar"><div class="fill" style="width:<?= $pct ?>%;background:<?= $stageColor ?>"></div></div>
-                  <span style="font-size:.7rem;color:var(--text-tertiary)"><?= $pct ?>%</span>
-                </div>
-              </div>
-            </a>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </div>
+// ── Build bulk order info ──
+$infoHtml = '<ul class="info-list">';
+$infoHtml .= '<li><i class="fas fa-check-circle" style="color:var(--color-success)"></i>Samples reviewed within 48 hours</li>';
+$infoHtml .= '<li><i class="fas fa-check-circle" style="color:var(--color-success)"></i>Bulk production starts after sample approval</li>';
+$infoHtml .= '<li><i class="fas fa-check-circle" style="color:var(--color-success)"></i>Real-time production tracking</li>';
+$infoHtml .= '<li><i class="fas fa-check-circle" style="color:var(--color-success)"></i>Notifications at every milestone</li>';
+$infoHtml .= '</ul>';
 
-        <!-- Right Panel -->
-        <div class="side-panel">
-          <!-- Pending Sample Approvals -->
-          <div class="panel-card">
-            <h3><i class="fas fa-flask" style="color:#7c3aed"></i> Sample Approvals</h3>
-            <?php if ($pendingSampleOrders->rowCount() === 0): ?>
-              <div style="font-size:.8rem;color:var(--text-tertiary);text-align:center;padding:8px 0">No pending sample reviews.</div>
-            <?php else: foreach ($pendingSampleOrders as $s): ?>
-              <div class="activity-item">
-                <span class="dot" style="background:#7c3aed"></span>
-                <div class="text">
-                  <strong>#ORD-<?= $s['order_id'] ?></strong> — <?= htmlspecialchars($s['service_name']) ?> · <?= (int)$s['total_qty'] ?> pcs
-                  <div class="time">Submitted <?= date('M j', strtotime($s['submitted_at'])) ?></div>
-                </div>
-                <a href="sample_review.php" class="dash-btn dash-btn-primary dash-btn-sm" style="flex-shrink:0">Review</a>
-              </div>
-            <?php endforeach; endif; ?>
-          </div>
+// ── Build rewards HTML ──
+$rewardsHtml = '<div class="quick-stats-grid" style="grid-template-columns:1fr 1fr">';
+$rewardsHtml .= '<div><span class="quick-stats-label">Items Purchased</span><br><strong class="quick-stats-value">' . $totalItemsPurchased . '</strong></div>';
+$rewardsHtml .= '<div><span class="quick-stats-label">Free Shirts</span><br><strong class="quick-stats-value">' . $freeShirtsEarned . '</strong></div>';
+$rewardsHtml .= '</div>';
+$rewardsHtml .= '<div style="font-size:0.75rem;color:var(--text-tertiary);margin-top:8px">1 free shirt per 12 items</div>';
 
-          <!-- Quick Info -->
-          <div class="panel-card">
-            <h3><i class="fas fa-info-circle" style="color:var(--accent-blue)"></i> Bulk Order Info</h3>
-            <ul style="list-style:none;padding:0;margin:0;font-size:.8rem;color:var(--text-secondary)">
-              <li style="padding:6px 0"><i class="fas fa-check-circle text-success me-2"></i>Samples reviewed within 48 hours</li>
-              <li style="padding:6px 0"><i class="fas fa-check-circle text-success me-2"></i>Bulk production starts after sample approval</li>
-              <li style="padding:6px 0"><i class="fas fa-check-circle text-success me-2"></i>Real-time production tracking</li>
-              <li style="padding:6px 0"><i class="fas fa-check-circle text-success me-2"></i>Notifications at every milestone</li>
-            </ul>
-          </div>
+// ── Render ──
+$sidebarPanels = renderPanelCard('Sample Approvals', $samplesHtml, 'fas fa-flask')
+    . renderPanelCard('Bulk Order Info', $infoHtml, 'fas fa-info-circle')
+    . renderPanelCard('Loyalty Rewards', $rewardsHtml, 'fas fa-gift')
+    . renderPanelCard('Ready for Pickup',
+        '<div class="ready-pickup-value">' . $readyPickupVal . '</div><div class="ready-pickup-label">items waiting for you</div>',
+        'fas fa-box-open');
 
-          <!-- Quick Stats -->
-          <div class="panel-card">
-            <h3><i class="fas fa-box-open" style="color:var(--accent-emerald)"></i> Ready for Pickup</h3>
-            <div style="font-size:2rem;font-weight:800;color:var(--accent-emerald)"><?= $readyPickup->fetchColumn() ?></div>
-            <div style="font-size:.8rem;color:var(--text-secondary)">items waiting for you</div>
-          </div>
-        </div>
-      </div>
-
+echo renderDashboardShell(
+  renderPageHeader(
+    'My Dashboard',
+    "Welcome back, {$firstName} · Track your orders, review samples, and earn rewards",
+    date('l, F j'),
+    [['label' => 'Place Order', 'href' => 'place_order.php', 'icon' => 'fas fa-plus', 'variant' => 'primary', 'size' => 'sm'],
+     ['label' => 'My Orders', 'href' => 'my_orders.php', 'icon' => 'fas fa-folder-open', 'variant' => 'outline', 'size' => 'sm']]
+  ),
+  renderQuickActions([
+    ['label' => 'Place New Order', 'href' => 'place_order.php', 'icon' => 'fas fa-plus-circle', 'description' => 'Start a bulk order'],
+    ['label' => 'Track Orders', 'href' => 'my_orders.php', 'icon' => 'fas fa-search', 'description' => 'View order progress'],
+    ['label' => 'Review Samples', 'href' => 'sample_review.php', 'icon' => 'fas fa-flask', 'description' => 'Approve or reject'],
+    ['label' => 'Notifications', 'href' => 'notifications.php', 'icon' => 'fas fa-bell', 'description' => 'View updates'],
+  ]),
+  renderKPIRow([
+    ['icon' => 'fas fa-shopping-bag',   'label' => 'Total Orders',    'value' => $totalOrdersVal,   'accent' => 'blue'],
+    ['icon' => 'fas fa-spinner',        'label' => 'Active',          'value' => $activeOrdersVal,  'accent' => 'amber'],
+    ['icon' => 'fas fa-flask',          'label' => 'Pending Sample',  'value' => $pendingSampleVal, 'accent' => 'purple'],
+    ['icon' => 'fas fa-check-circle',   'label' => 'Completed',       'value' => $completedOrdersVal,'accent' => 'green'],
+  ])
+  . $timelineHtml, // Append current order timeline after KPIs
+  renderTwoColumn(
+    renderPageSection('Recent Orders', $recentOrdersHtml, 'fas fa-folder-open',
+      [['label' => 'View All', 'href' => 'my_orders.php', 'icon' => 'fas fa-external-link-alt', 'variant' => 'outline']]),
+    $sidebarPanels
+  )
+);
+?>
     </div>
   </div>
 </div>
 
 <script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
-});
-
 function toggleNotifications() {
   fetch('/app/Controllers/notifications_api.php?action=list')
     .then(r => r.json())

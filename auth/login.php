@@ -97,7 +97,10 @@ $error = get_flash('error');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <title>Sign In - Sakuragi</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -118,15 +121,8 @@ $error = get_flash('error');
             </div>
           </div>
 
-          <span class="eyebrow">Customer and staff access</span>
-          <h1>Sign in to manage orders, updates, and production work.</h1>
-          <p>Use one account system for customer tracking, shop coordination, and team workflows without switching between separate tools.</p>
-
-          <div class="feature-list">
-            <div class="feature-item"><span class="icon"><i class="fas fa-ruler-combined"></i></span> Measurements, notes, and requests stay attached to each order.</div>
-            <div class="feature-item"><span class="icon"><i class="fas fa-list-check"></i></span> Follow progress from intake to release with clearer status updates.</div>
-            <div class="feature-item"><span class="icon"><i class="fas fa-people-group"></i></span> Separate access for admin, staff, and customers.</div>
-          </div>
+          <h1>Your tailoring experience,<br>simplified.</h1>
+          <p>Track orders, receive updates, and stay connected with your tailoring requests — all in one place.</p>
         </div>
       </section>
 
@@ -180,7 +176,7 @@ $error = get_flash('error');
             <p class="modal-kicker">Sample accounts</p>
             <h3 id="demo-access-title">Demo access</h3>
           </div>
-          <button type="button" class="modal-close" aria-label="Close demo access" data-modal-close>
+          <button type="button" class="modal-close" aria-label="Close demo access" data-modal-close onclick="this.closest('[data-modal]').hidden = true; document.body.classList.remove('modal-open');">
             <i class="fas fa-xmark"></i>
           </button>
         </div>

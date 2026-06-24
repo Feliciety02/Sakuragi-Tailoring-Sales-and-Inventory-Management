@@ -3,379 +3,185 @@ require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once '../../app/Middleware/auth_required.php';
 require_once '../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
+
 $pageTitle = 'Completed Tasks';
 
-// Protect: If customer somehow reaches employee pages
 if (get_user_role() === ROLE_CUSTOMER) {
     header('Location: /dashboards/customer/dashboard.php');
     exit();
 }
 
-// Get currently logged in user's ID
 $user_id = $_SESSION['user_id'];
 
-// Handle filters
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $valid_filters = ['all', 'passed', 'failed'];
-if (!in_array($filter, $valid_filters)) {
-    $filter = 'all';
-}
+if (!in_array($filter, $valid_filters)) $filter = 'all';
 
 try {
-    // Check if work_submissions table exists
     $hasWorkSubmissions = false;
     try {
-        $checkWs = $pdo->query("SELECT 1 FROM work_submissions LIMIT 1");
+        $pdo->query("SELECT 1 FROM work_submissions LIMIT 1");
         $hasWorkSubmissions = true;
-    } catch (PDOException $e) {
-        $hasWorkSubmissions = false;
-    }
+    } catch (PDOException $e) { $hasWorkSubmissions = false; }
 
     if ($hasWorkSubmissions) {
         $taskSql = "
-            SELECT o.order_id, o.order_date, o.status, o.completion_date, 
-                   ws.notes, ws.status AS qc_status, ws.feedback,
-                   ow.product_type
+            SELECT o.order_id, o.order_date, o.status, o.completion_date,
+                   ws.notes, ws.status AS qc_status, ws.feedback, ow.product_type
             FROM orders o
             JOIN order_workflow ow ON o.order_id = ow.order_id
             LEFT JOIN work_submissions ws ON o.order_id = ws.order_id AND ws.employee_id = ?
-            WHERE ow.assigned_employee = ?
-            AND o.status = 'Completed'
+            WHERE ow.assigned_employee = ? AND o.status = 'Completed'
         ";
         $params = [$user_id, $user_id];
-        if ($filter === 'passed') {
-            $taskSql .= " AND (ws.status = 'Passed' OR ws.status IS NULL)";
-        } elseif ($filter === 'failed') {
-            $taskSql .= " AND ws.status = 'Failed'";
-        }
+        if ($filter === 'passed') $taskSql .= " AND (ws.status = 'Passed' OR ws.status IS NULL)";
+        elseif ($filter === 'failed') $taskSql .= " AND ws.status = 'Failed'";
     } else {
         $taskSql = "
-            SELECT o.order_id, o.order_date, o.status, o.completion_date, 
-                   NULL AS notes, NULL AS qc_status, NULL AS feedback,
-                   ow.product_type
+            SELECT o.order_id, o.order_date, o.status, o.completion_date,
+                   NULL AS notes, NULL AS qc_status, NULL AS feedback, ow.product_type
             FROM orders o
             JOIN order_workflow ow ON o.order_id = ow.order_id
-            WHERE ow.assigned_employee = ?
-            AND o.status = 'Completed'
+            WHERE ow.assigned_employee = ? AND o.status = 'Completed'
         ";
         $params = [$user_id];
     }
 
     $taskSql .= ' ORDER BY o.completion_date DESC, o.order_date DESC';
-
     $taskStmt = $pdo->prepare($taskSql);
     $taskStmt->execute($params);
     $completedTasks = $taskStmt->fetchAll();
 } catch (PDOException $e) {
-    // Log the error, don't stop page from loading
     error_log('Completed Tasks error: ' . $e->getMessage());
     $completedTasks = [];
 }
 
-// Handle task reopen request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reopen_task'])) {
-    $taskId = isset($_POST['task_id']) ? intval($_POST['task_id']) : 0;
-
+    $taskId = (int)($_POST['task_id'] ?? 0);
     if ($taskId > 0) {
         try {
-            // Begin transaction
             $pdo->beginTransaction();
-
-            // Update order status
-            $updateOrderSql = "
-                UPDATE orders SET status = 'In Progress' WHERE order_id = ?
-            ";
-            $updateOrderStmt = $pdo->prepare($updateOrderSql);
-            $updateOrderStmt->execute([$taskId]);
-
-            // Update submission status (if table exists)
-            try {
-                $updateSubSql = "
-                    UPDATE work_submissions SET status = 'Reopened' WHERE order_id = ? AND employee_id = ?
-                ";
-                $updateSubStmt = $pdo->prepare($updateSubSql);
-                $updateSubStmt->execute([$taskId, $user_id]);
-            } catch (PDOException $e) {
-                error_log('work_submissions not available: ' . $e->getMessage());
-            }
-
-            // Commit transaction
+            $pdo->prepare("UPDATE orders SET status = 'In Progress' WHERE order_id = ?")->execute([$taskId]);
+            try { $pdo->prepare("UPDATE work_submissions SET status = 'Reopened' WHERE order_id = ? AND employee_id = ?")->execute([$taskId, $user_id]); }
+            catch (PDOException $e) { error_log('work_submissions not available: ' . $e->getMessage()); }
             $pdo->commit();
-
-            // Redirect to refresh the page
             header('Location: completed_tasks.php');
             exit();
-        } catch (PDOException $e) {
-            // Rollback transaction on error
-            $pdo->rollBack();
-            error_log('Reopen task error: ' . $e->getMessage());
-        }
+        } catch (PDOException $e) { $pdo->rollBack(); error_log('Reopen task error: ' . $e->getMessage()); }
     }
 }
 
-// Helper function to get appropriate badge class based on status
-function get_qc_badge_class($status)
-{
-    switch ($status) {
-        case 'Passed':
-        case 'Passed QC':
-            return 'bg-success';
-        case 'Failed':
-        case 'Failed QC':
-            return 'bg-danger';
-        default:
-            return 'bg-warning';
-    }
-}
-?>
-<!DOCTYPE html>
+$role = get_user_role();
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Completed Tasks — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
 </head>
-<body>
+<body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
   <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-    <div class="container-fluid">
-        <div class="row mb-4">
-            <div class="col-12">
-                <h1 class="fw-bold fs-4 mb-1">Completed Tasks</h1>
-                <p class="text-secondary">Review your completed work and QC results</p>
-            </div>
-        </div>
-        
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Search by ID or garment type..." id="task-search">
-                </div>
-            </div>
-            <div class="col-md-6 text-md-end">
-                <div class="dropdown d-inline-block">
-                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <?php if ($filter === 'passed') {
-                            echo 'Passed QC';
-                        } elseif ($filter === 'failed') {
-                            echo 'Failed QC';
-                        } else {
-                            echo 'All Results';
-                        } ?>
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="filterDropdown">
-                        <li><a class="dropdown-item <?= $filter === 'all'
-                            ? 'active'
-                            : '' ?>" href="?filter=all">All Results</a></li>
-                        <li><a class="dropdown-item <?= $filter === 'passed'
-                            ? 'active'
-                            : '' ?>" href="?filter=passed">Passed QC</a></li>
-                        <li><a class="dropdown-item <?= $filter === 'failed'
-                            ? 'active'
-                            : '' ?>" href="?filter=failed">Failed QC</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-striped table-hover border" id="completed-tasks-table">
-                <thead class="bg-primary text-white">
-                    <tr>
-                        <th>Job ID</th>
-                        <th>Garment Type</th>
-                        <th>Completed Date</th>
-                        <th>QC Result</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($completedTasks)): ?>
-                        <?php foreach ($completedTasks as $task):
+<?php
+if (empty($completedTasks)):
+  $tableContent = renderEmptyState('fas fa-check-circle', 'No completed tasks found', 'Tasks you complete will appear here.', $filter !== 'all' ? ['label' => 'Show all tasks', 'href' => '?filter=all', 'icon' => 'fas fa-list'] : []);
+else:
+  $cols = [
+    ['field' => 'job_id', 'label' => 'Job ID'],
+    ['field' => 'garment', 'label' => 'Garment Type'],
+    ['field' => 'completed', 'label' => 'Completed Date'],
+    ['field' => 'qc_status', 'label' => 'QC Result', 'type' => 'badge'],
+    ['field' => 'actions', 'label' => 'Actions', 'type' => 'actions'],
+  ];
+  $data = [];
+  foreach ($completedTasks as $task):
+    $jobId = 'JOB-' . str_pad($task['order_id'], 4, '0', STR_PAD_LEFT);
+    $garmentType = $task['product_type'] ?? 'Custom Garment';
+    $completedDate = !empty($task['completion_date']) ? date('M d, Y', strtotime($task['completion_date'])) : date('M d, Y', strtotime($task['order_date']));
+    $qcStatus = $task['qc_status'] ?? 'Pending QC';
+    $qcVariant = $qcStatus === 'Passed' || $qcStatus === 'Passed QC' ? 'success' : ($qcStatus === 'Failed' || $qcStatus === 'Failed QC' ? 'danger' : 'warning');
+    $actions = [['label' => 'View Results', 'icon' => 'fas fa-eye', 'href' => '#', 'variant' => 'accent', 'onclick' => "viewResults('{$jobId}','" . htmlspecialchars($garmentType, ENT_QUOTES) . "','" . date('M d, Y', strtotime($task['completion_date'])) . "','{$qcStatus}','" . htmlspecialchars($task['feedback'] ?? 'No feedback provided yet.', ENT_QUOTES) . "');return false"]];
+    if ($qcStatus === 'Failed' || $qcStatus === 'Failed QC'):
+      $actions[] = ['label' => 'Reopen', 'icon' => 'fas fa-undo', 'href' => '#', 'variant' => 'outline', 'onclick' => "document.getElementById('reopenForm-{$task['order_id']}').submit();return false"];
+    endif;
+    $data[] = [
+      'job_id' => $jobId,
+      'garment' => $garmentType,
+      'completed' => $completedDate,
+      'qc_status' => $qcStatus,
+      'actions' => $actions,
+    ];
+  endforeach;
 
-                            // Convert order_id to job format
-                            $jobId = 'JOB-' . str_pad($task['order_id'], 4, '0', STR_PAD_LEFT);
+  ob_start();
+  foreach ($completedTasks as $task):
+    if ($task['qc_status'] === 'Failed' || $task['qc_status'] === 'Failed QC'):
+?>
+<form method="post" id="reopenForm-<?= $task['order_id'] ?>" style="display:none">
+  <input type="hidden" name="task_id" value="<?= $task['order_id'] ?>">
+  <input type="hidden" name="reopen_task" value="1">
+</form>
+<?php endif; endforeach;
+  $hiddenForms = ob_get_clean();
 
-                            // Determine garment type
-                            $garmentType = $task['product_type'] ?? 'Custom Garment';
+  $tableContent = renderDataTable('completed-tasks', $cols, $data, [
+    'searchable' => true, 'searchPlaceholder' => 'Search by ID or garment type...',
+    'actions' => [
+      ['label' => 'All Results', 'href' => '?filter=all', 'variant' => $filter === 'all' ? 'primary' : 'outline', 'size' => 'sm'],
+      ['label' => 'Passed QC', 'href' => '?filter=passed', 'variant' => $filter === 'passed' ? 'primary' : 'outline', 'size' => 'sm'],
+      ['label' => 'Failed QC', 'href' => '?filter=failed', 'variant' => $filter === 'failed' ? 'primary' : 'outline', 'size' => 'sm'],
+    ],
+  ]);
+  $tableContent .= $hiddenForms;
+endif;
 
-                            // Format completed date
-                            $completedDate = !empty($task['completion_date'])
-                                ? date('M d, Y', strtotime($task['completion_date']))
-                                : date('M d, Y', strtotime($task['order_date']));
-
-                            // Determine QC status
-                            $qcStatus = '';
-                            $badgeClass = '';
-
-                            if (!empty($task['qc_status'])) {
-                                if ($task['qc_status'] === 'Passed') {
-                                    $qcStatus = 'Passed QC';
-                                    $badgeClass = 'bg-success';
-                                } elseif ($task['qc_status'] === 'Failed') {
-                                    $qcStatus = 'Failed QC';
-                                    $badgeClass = 'bg-danger';
-                                } else {
-                                    $qcStatus = 'Pending QC';
-                                    $badgeClass = 'bg-warning';
-                                }
-                            } else {
-                                $qcStatus = 'Pending QC';
-                                $badgeClass = 'bg-warning';
-                            }
-                            ?>
-                        <tr>
-                            <td class="fw-bold"><?= htmlspecialchars($jobId) ?></td>
-                            <td><?= htmlspecialchars($garmentType) ?></td>
-                            <td><?= htmlspecialchars($completedDate) ?></td>
-                            <td><span class="badge rounded-pill <?= $badgeClass ?>"><?= htmlspecialchars(
-    $qcStatus
-) ?></span></td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary view-results" 
-                                       data-job-id="<?= htmlspecialchars($jobId) ?>"
-                                       data-garment="<?= htmlspecialchars($garmentType) ?>"
-                                       data-feedback="<?= htmlspecialchars(
-                                           $task['feedback'] ?? 'No feedback provided yet.'
-                                       ) ?>"
-                                       data-status="<?= htmlspecialchars($qcStatus) ?>"
-                                       data-completed="<?= htmlspecialchars($completedDate) ?>"
-                                       data-bs-toggle="modal" 
-                                       data-bs-target="#viewResultsModal">
-                                    <i class="bi bi-eye"></i> View Results
-                                </button>
-                                
-                                <?php if ($task['qc_status'] === 'Failed'): ?>
-                                <form method="post" class="d-inline-block" onsubmit="return confirm('Are you sure you want to reopen this task?');">
-                                    <input type="hidden" name="task_id" value="<?= $task['order_id'] ?>">
-                                    <button type="submit" name="reopen_task" class="btn btn-sm btn-outline-secondary">
-                                        <i class="bi bi-arrow-counterclockwise"></i> Reopen
-                                    </button>
-                                </form>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php
-                        endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="5" class="text-center py-5">
-                                <div class="py-4">
-                                    <i class="bi bi-file-earmark-text fs-1 text-muted mb-3"></i>
-                                    <p class="text-muted mb-3">No completed tasks found</p>
-                                    <?php if ($filter !== 'all'): ?>
-                                        <a href="?filter=all" class="btn btn-outline-primary">Show all tasks</a>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+echo renderDashboardShell(
+  renderPageHeader('Completed Tasks', 'Review your completed work and QC results.'),
+  '',
+  $tableContent
+);
+?>
     </div>
-    
-    <!-- View Results Modal -->
-    <div class="modal fade" id="viewResultsModal" tabindex="-1" aria-labelledby="viewResultsModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="viewResultsModalLabel">QC Results</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body bg-light border-start border-4 border-primary">
-                    <div class="mb-3">
-                        <h6 class="text-primary fw-bold mb-1 small">Job</h6>
-                        <p id="modal-job-id" class="fw-bold mb-0"></p>
-                    </div>
-                    <div class="mb-3">
-                        <h6 class="text-primary fw-bold mb-1 small">Garment</h6>
-                        <p id="modal-garment" class="mb-0"></p>
-                    </div>
-                    <div class="mb-3">
-                        <h6 class="text-primary fw-bold mb-1 small">Completed On</h6>
-                        <p id="modal-completed" class="mb-0"></p>
-                    </div>
-                    <div class="mb-3">
-                        <h6 class="text-primary fw-bold mb-1 small">Status</h6>
-                        <p id="modal-status" class="fw-bold mb-0"></p>
-                    </div>
-                    <div>
-                        <h6 class="text-primary fw-bold mb-1 small">QC Feedback</h6>
-                        <div class="p-3 bg-white border border-1 rounded">
-                            <p id="modal-feedback" class="mb-0"></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
+
+<div class="modern-modal-overlay" id="resultsModal" style="display:none" onclick="if(event.target===this)closeResults()">
+  <div class="modern-modal" style="max-width:480px">
+    <h3 style="margin:0 0 16px;font-size:1.05rem;font-weight:700;color:var(--text-primary)">QC Results</h3>
+    <div style="display:grid;gap:12px;font-size:0.85rem">
+      <div><strong style="color:var(--text-secondary)">Job:</strong><br><span id="rm-job" style="color:var(--text-primary);font-weight:600"></span></div>
+      <div><strong style="color:var(--text-secondary)">Garment:</strong><br><span id="rm-garment" style="color:var(--text-primary)"></span></div>
+      <div><strong style="color:var(--text-secondary)">Completed On:</strong><br><span id="rm-completed" style="color:var(--text-primary)"></span></div>
+      <div><strong style="color:var(--text-secondary)">Status:</strong><br><span id="rm-status"></span></div>
+      <div><strong style="color:var(--text-secondary)">QC Feedback:</strong><br><div style="background:var(--bg-secondary);padding:12px;border-radius:8px;margin-top:4px"><span id="rm-feedback" style="color:var(--text-primary)"></span></div></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="dash-btn dash-btn-outline dash-btn-sm" onclick="closeResults()">Close</button>
+    </div>
   </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Search functionality
-    const searchInput = document.getElementById('task-search');
-    const tasksTable = document.getElementById('completed-tasks-table');
-    
-    if (searchInput && tasksTable) {
-        searchInput.addEventListener('keyup', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = tasksTable.querySelectorAll('tbody tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
-            });
-        });
-    }
-    
-    // View results modal functionality
-    const viewResultsBtns = document.querySelectorAll('.view-results');
-    
-    viewResultsBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const jobId = this.getAttribute('data-job-id');
-            const garment = this.getAttribute('data-garment');
-            const feedback = this.getAttribute('data-feedback');
-            const status = this.getAttribute('data-status');
-            const completed = this.getAttribute('data-completed');
-            
-            document.getElementById('modal-job-id').textContent = jobId;
-            document.getElementById('modal-garment').textContent = garment;
-            document.getElementById('modal-feedback').textContent = feedback;
-            document.getElementById('modal-status').textContent = status;
-            document.getElementById('modal-completed').textContent = completed;
-            
-            // Add color to status based on result
-            if (status.includes('Passed')) {
-                document.getElementById('modal-status').className = 'fw-bold mb-0 text-success';
-            } else if (status.includes('Failed')) {
-                document.getElementById('modal-status').className = 'fw-bold mb-0 text-danger';
-            } else {
-                document.getElementById('modal-status').className = 'fw-bold mb-0 text-warning';
-            }
-        });
-    });
-});
-</script>
-
-<script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
-});
+function viewResults(jobId, garment, completed, status, feedback) {
+  document.getElementById('rm-job').textContent = jobId;
+  document.getElementById('rm-garment').textContent = garment;
+  document.getElementById('rm-completed').textContent = completed;
+  var statusEl = document.getElementById('rm-status');
+  statusEl.innerHTML = '<span class="dash-badge dash-badge-' + (status.includes('Passed') ? 'success' : status.includes('Failed') ? 'danger' : 'warning') + '">' + status + '</span>';
+  document.getElementById('rm-feedback').textContent = feedback;
+  document.getElementById('resultsModal').style.display = 'flex';
+}
+function closeResults() { document.getElementById('resultsModal').style.display = 'none'; }
+document.getElementById('menuToggle')?.addEventListener('click', function() { document.getElementById('sidebar')?.classList.toggle('collapsed'); });
 </script>
 </body>
 </html>

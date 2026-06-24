@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../../config/constants.php';
+
 // Sanitize input (prevent XSS)
 function sanitize_input($data) {
     return htmlspecialchars(strip_tags(trim($data)));
@@ -225,7 +227,132 @@ function get_role_sidebar_view(PDO $pdo, ?string $role = null, ?int $userId = nu
     }
 }
 
+function get_nav_items_for_role(PDO $pdo, ?string $role = null, ?int $userId = null): array {
+    $role = $role ?? (string) ($_SESSION['role'] ?? '');
+    $userId = $userId ?? (int) ($_SESSION['user_id'] ?? 0);
+
+    // Normalize legacy roles
+    if (in_array($role, [ROLE_MANAGER, ROLE_EMPLOYEE], true)) {
+        $ctx = get_user_position_context($pdo, $userId);
+        $role = $ctx['role'];
+    }
+
+    $dashAdmin = fn(string $p) => '/dashboards/admin/' . $p;
+    $dashEmp = fn(string $p) => '/dashboards/employee/' . $p;
+
+    $groups = [
+        ROLE_ADMIN => [
+            ['type' => 'link', 'href' => $dashAdmin('dashboard.php'), 'icon' => 'fas fa-th-large', 'label' => 'Dashboard'],
+            ['type' => 'group', 'id' => 'admin-production', 'icon' => 'fas fa-columns', 'label' => 'Production', 'children' => [
+                ['href' => $dashAdmin('production_board.php'), 'icon' => 'fas fa-columns', 'label' => 'Production Board'],
+                ['href' => $dashAdmin('orders.php'), 'icon' => 'fas fa-shopping-bag', 'label' => 'Orders Queue'],
+                ['href' => $dashAdmin('sample_approvals.php'), 'icon' => 'fas fa-flask', 'label' => 'Sample Approvals'],
+                ['href' => $dashAdmin('production_schedule.php'), 'icon' => 'fas fa-calendar-alt', 'label' => 'Schedule'],
+                ['href' => $dashAdmin('workload.php'), 'icon' => 'fas fa-tasks', 'label' => 'Workload'],
+            ]],
+            ['type' => 'group', 'id' => 'admin-quality', 'icon' => 'fas fa-clipboard-check', 'label' => 'Quality Control', 'children' => [
+                ['href' => $dashAdmin('quality_control.php'), 'icon' => 'fas fa-clipboard-check', 'label' => 'QC Dashboard'],
+                ['href' => $dashAdmin('aql_qc.php'), 'icon' => 'fas fa-chart-pie', 'label' => 'AQL Sampling QC'],
+            ]],
+            ['type' => 'group', 'id' => 'admin-analytics', 'icon' => 'fas fa-chart-bar', 'label' => 'Reports', 'children' => [
+                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports &amp; Analytics'],
+                ['href' => $dashAdmin('production_analytics.php'), 'icon' => 'fas fa-chart-line', 'label' => 'Analytics'],
+            ]],
+            ['type' => 'group', 'id' => 'admin-resources', 'icon' => 'fas fa-box', 'label' => 'Inventory &amp; Materials', 'children' => [
+                ['href' => $dashAdmin('inventory.php'), 'icon' => 'fas fa-box', 'label' => 'Inventory'],
+                ['href' => $dashAdmin('order_materials.php'), 'icon' => 'fas fa-roll', 'label' => 'Order Materials'],
+            ]],
+            ['type' => 'group', 'id' => 'admin-team', 'icon' => 'fas fa-users', 'label' => 'Team &amp; Settings', 'children' => [
+                ['href' => $dashAdmin('employees.php'), 'icon' => 'fas fa-users', 'label' => 'Employees'],
+                ['href' => $dashAdmin('settings.php'), 'icon' => 'fas fa-cog', 'label' => 'Settings'],
+            ]],
+        ],
+        ROLE_CUSTOMER => [
+            ['type' => 'link', 'href' => '/dashboards/customer/dashboard.php', 'icon' => 'fas fa-home', 'label' => 'Home'],
+            ['type' => 'group', 'id' => 'cust-orders', 'icon' => 'fas fa-shopping-bag', 'label' => 'My Orders', 'children' => [
+                ['href' => '/dashboards/customer/place_order.php', 'icon' => 'fas fa-plus-circle', 'label' => 'Place New Order'],
+                ['href' => '/dashboards/customer/my_orders.php', 'icon' => 'fas fa-folder-open', 'label' => 'My Orders'],
+                ['href' => '/dashboards/customer/sample_review.php', 'icon' => 'fas fa-flask', 'label' => 'Sample Approvals'],
+            ]],
+            ['type' => 'group', 'id' => 'cust-settings', 'icon' => 'fas fa-cog', 'label' => 'Settings', 'children' => [
+                ['href' => '/dashboards/customer/notifications.php', 'icon' => 'fas fa-bell', 'label' => 'Notifications'],
+                ['href' => '/dashboards/customer/account.php', 'icon' => 'fas fa-user-cog', 'label' => 'My Account'],
+            ]],
+        ],
+        ROLE_PRODUCTION_STAFF => [
+            ['type' => 'link', 'href' => $dashEmp('dashboard.php'), 'icon' => 'fas fa-th-large', 'label' => 'Dashboard'],
+            ['type' => 'group', 'id' => 'emp-tasks', 'icon' => 'fas fa-tasks', 'label' => 'My Work', 'children' => [
+                ['href' => $dashEmp('my_tasks.php'), 'icon' => 'fas fa-tasks', 'label' => 'My Tasks'],
+                ['href' => $dashEmp('kanban.php'), 'icon' => 'fas fa-columns', 'label' => 'Kanban Board'],
+                ['href' => $dashEmp('assigned_orders.php'), 'icon' => 'fas fa-clipboard-list', 'label' => 'Assigned Orders'],
+                ['href' => $dashEmp('completed_tasks.php'), 'icon' => 'fas fa-check-circle', 'label' => 'Completed Tasks'],
+            ]],
+            ['type' => 'group', 'id' => 'emp-tools', 'icon' => 'fas fa-toolbox', 'label' => 'Tools', 'children' => [
+                ['href' => $dashAdmin('inventory.php'), 'icon' => 'fas fa-box', 'label' => 'Inventory'],
+                ['href' => $dashEmp('garment_tracking.php'), 'icon' => 'fas fa-shirt', 'label' => 'Garment Tracking'],
+                ['href' => $dashEmp('profile.php'), 'icon' => 'fas fa-user', 'label' => 'Profile'],
+            ]],
+        ],
+        ROLE_OPERATIONS_MANAGER => [
+            ['type' => 'link', 'href' => $dashAdmin('dashboard.php'), 'icon' => 'fas fa-th-large', 'label' => 'Dashboard'],
+            ['type' => 'group', 'id' => 'ops-production', 'icon' => 'fas fa-columns', 'label' => 'Production', 'children' => [
+                ['href' => $dashAdmin('production_board.php'), 'icon' => 'fas fa-columns', 'label' => 'Production Board'],
+                ['href' => $dashAdmin('orders.php'), 'icon' => 'fas fa-shopping-bag', 'label' => 'Orders Queue'],
+                ['href' => $dashAdmin('sample_approvals.php'), 'icon' => 'fas fa-flask', 'label' => 'Sample Approvals'],
+                ['href' => $dashAdmin('production_schedule.php'), 'icon' => 'fas fa-calendar-alt', 'label' => 'Scheduling'],
+            ]],
+            ['type' => 'group', 'id' => 'ops-workforce', 'icon' => 'fas fa-users', 'label' => 'Workforce', 'children' => [
+                ['href' => $dashAdmin('workload.php'), 'icon' => 'fas fa-tasks', 'label' => 'Workload'],
+                ['href' => $dashAdmin('production_analytics.php'), 'icon' => 'fas fa-chart-line', 'label' => 'Team Performance'],
+                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports &amp; Analytics'],
+            ]],
+            ['type' => 'link', 'href' => $dashEmp('profile.php'), 'icon' => 'fas fa-user', 'label' => 'Profile'],
+        ],
+        ROLE_INVENTORY_MANAGER => [
+            ['type' => 'link', 'href' => $dashAdmin('dashboard.php'), 'icon' => 'fas fa-th-large', 'label' => 'Dashboard'],
+            ['type' => 'group', 'id' => 'inv-stock', 'icon' => 'fas fa-box', 'label' => 'Stock Management', 'children' => [
+                ['href' => $dashAdmin('inventory.php'), 'icon' => 'fas fa-box', 'label' => 'Stock Levels'],
+                ['href' => $dashAdmin('order_materials.php'), 'icon' => 'fas fa-roll', 'label' => 'Material Reservations'],
+            ]],
+            ['type' => 'link', 'href' => $dashEmp('profile.php'), 'icon' => 'fas fa-user', 'label' => 'Profile'],
+        ],
+        ROLE_QUALITY_CONTROL_INSPECTOR => [
+            ['type' => 'link', 'href' => '/dashboards/employee/employeePosition/qcInspector/dashboard.php', 'icon' => 'fas fa-clipboard-check', 'label' => 'QC Dashboard'],
+            ['type' => 'link', 'href' => '/dashboards/employee/employeePosition/qcInspector/aql_dashboard.php', 'icon' => 'fas fa-chart-pie', 'label' => 'AQL Lot Inspection'],
+            ['type' => 'group', 'id' => 'qc-inspections', 'icon' => 'fas fa-search', 'label' => 'Inspections', 'children' => [
+                ['href' => '/dashboards/employee/employeePosition/qcInspector/inspect.php', 'icon' => 'fas fa-search', 'label' => 'Inspect Items'],
+                ['href' => '/dashboards/employee/employeePosition/qcInspector/history.php', 'icon' => 'fas fa-history', 'label' => 'Inspection History'],
+            ]],
+            ['type' => 'link', 'href' => $dashEmp('my_tasks.php'), 'icon' => 'fas fa-tasks', 'label' => 'My Tasks'],
+            ['type' => 'link', 'href' => $dashEmp('profile.php'), 'icon' => 'fas fa-user', 'label' => 'Profile'],
+        ],
+    ];
+
+    // Senior tailor shares employee nav but override Dashboard
+    if (isset($_SESSION['position_name']) && strtolower($_SESSION['position_name']) === 'senior tailor') {
+        return [
+            ['type' => 'link', 'href' => '/dashboards/employee/employeePosition/seniorTailor/dashboard.php', 'icon' => 'fas fa-home', 'label' => 'Dashboard'],
+            ['type' => 'group', 'id' => 'st-records', 'icon' => 'fas fa-clipboard-check', 'label' => 'Records', 'children' => [
+                ['href' => '/dashboards/employee/employeePosition/seniorTailor/inspectRecords.php', 'icon' => 'fas fa-clipboard-check', 'label' => 'Inspection Records'],
+                ['href' => '/dashboards/employee/employeePosition/seniorTailor/item-to-inspect.php', 'icon' => 'fas fa-search', 'label' => 'Items to Inspect'],
+                ['href' => '/dashboards/employee/employeePosition/seniorTailor/rejection-Reports.php', 'icon' => 'fas fa-exclamation-triangle', 'label' => 'Rejection Reports'],
+            ]],
+        ];
+    }
+
+    return $groups[$role] ?? $groups[ROLE_CUSTOMER];
+}
+
 function render_role_sidebar(PDO $pdo, ?string $role = null, ?int $userId = null): void {
-    require get_role_sidebar_view($pdo, $role, $userId);
+    $role = $role ?? ($_SESSION['role'] ?? '');
+    $userId = $userId ?? ($_SESSION['user_id'] ?? 0);
+    $navItems = get_nav_items_for_role($pdo, $role, $userId);
+
+    $userName = $_SESSION['full_name'] ?? 'User';
+    $roleLabel = $_SESSION['role_name'] ?? $role;
+    $branch = $_SESSION['branch_name'] ?? '';
+    $initials = strtoupper(substr($userName, 0, 2));
+
+    require __DIR__ . '/../Views/Shared/sidebar.php';
 }
 ?>

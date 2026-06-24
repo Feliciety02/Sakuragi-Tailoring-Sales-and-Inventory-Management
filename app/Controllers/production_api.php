@@ -19,20 +19,20 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $notif = new NotificationController($pdo);
 
 function logGarmentTransition($pdo, $order_id, $from_stage, $to_stage, $employee_id, $notes = '') {
-    $details = $pdo->prepare("SELECT detail_id FROM order_details WHERE order_id = ?");
+    $details = $pdo->prepare("SELECT order_detail_id FROM order_details WHERE order_id = ?");
     $details->execute([$order_id]);
     while ($d = $details->fetch()) {
         $chk = $pdo->prepare("SELECT track_id FROM garment_tracking WHERE order_detail_id = ?");
-        $chk->execute([$d['detail_id']]);
+        $chk->execute([$d['order_detail_id']]);
         if ($existing = $chk->fetch()) {
             $pdo->prepare("UPDATE garment_tracking SET stage = ?, employee_id = ?, notes = ?, updated_at = NOW() WHERE track_id = ?")
                 ->execute([$to_stage, $employee_id, $notes, $existing['track_id']]);
         } else {
             $pdo->prepare("INSERT INTO garment_tracking (order_detail_id, order_id, stage, employee_id, notes) VALUES (?, ?, ?, ?, ?)")
-                ->execute([$d['detail_id'], $order_id, $to_stage, $employee_id, $notes]);
+                ->execute([$d['order_detail_id'], $order_id, $to_stage, $employee_id, $notes]);
         }
         $pdo->prepare("INSERT INTO garment_log (order_detail_id, order_id, from_stage, to_stage, employee_id, notes) VALUES (?, ?, ?, ?, ?, ?)")
-            ->execute([$d['detail_id'], $order_id, $from_stage, $to_stage, $employee_id, $notes]);
+            ->execute([$d['order_detail_id'], $order_id, $from_stage, $to_stage, $employee_id, $notes]);
     }
 }
 
@@ -463,7 +463,7 @@ try {
                 SELECT gt.*, od.size, od.quantity, od.unit_price,
                        u.full_name AS employee_name
                 FROM garment_tracking gt
-                JOIN order_details od ON gt.order_detail_id = od.detail_id
+                JOIN order_details od ON gt.order_detail_id = od.order_detail_id
                 LEFT JOIN users u ON gt.employee_id = u.user_id
                 WHERE gt.order_id = ?
                 ORDER BY od.size
@@ -473,7 +473,7 @@ try {
             $history = $pdo->prepare("
                 SELECT gl.*, od.size, u.full_name AS employee_name
                 FROM garment_log gl
-                JOIN order_details od ON gl.order_detail_id = od.detail_id
+                JOIN order_details od ON gl.order_detail_id = od.order_detail_id
                 LEFT JOIN users u ON gl.employee_id = u.user_id
                 WHERE gl.order_id = ?
                 ORDER BY gl.created_at DESC LIMIT 50

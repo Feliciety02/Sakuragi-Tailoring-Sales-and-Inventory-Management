@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
-
 require_once '../../app/Controllers/OrderController.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
@@ -11,132 +11,123 @@ if (get_user_role() !== ROLE_CUSTOMER) {
     exit();
 }
 
-// Initialize the OrderController with the PDO connection
 $orderController = new OrderController($pdo);
-
-// Fetch customer's orders using the OrderController
 try {
     $orders = $orderController->getCustomerOrders($_SESSION['user_id']);
 } catch (PDOException $e) {
-    // Log error
     error_log('Error fetching orders: ' . $e->getMessage());
     $orders = [];
 }
-<?php
+
 $pageTitle = 'My Orders';
-?>
-<!DOCTYPE html>
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Orders — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <link rel="stylesheet" href="/public/assets/css/order.css">
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
 </head>
-<body>
+<body data-role="customer">
 <div class="dash-layout">
   <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-    <h5 class="page-title">My Orders</h5>
-    <p class="page-subtext">Track your orders, design type, status, and staff handling them.</p>
-
-    <div class="my-orders-container">
-        <div class="table-wrapper">
-            <table class="my-orders-table">
-                <thead>
-                    <tr>
-                        <th>Order #</th>
-                        <th>Date</th>
-                        <th>Service</th>
-                        <th>Design Type</th>
-                        <th>Total Items</th>
-                        <th>Assigned Staff</th>
-                        <th>Expected Completion</th>
-                        <th>Status</th>
-                        <th>Payment</th>
-                        <th>Check</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($orders)): ?>
-                        <tr>
-                            <td colspan="10" class="text-center">No orders found</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($orders as $order): ?>
-                            <tr>
-                                <td>#ORD-<?= $order['order_id'] ?></td>
-                                <td><?= date('M d, Y', strtotime($order['order_date'])) ?></td>
-                                <td><?= htmlspecialchars($order['service_name']) ?></td>
-                                <td><?= $order['service_category'] === 'Embroidery' ||
-                                $order['service_category'] === 'Screen Printing'
-                                    ? 'Standard'
-                                    : 'N/A' ?></td>
-                                <td><?= $order['total_quantity'] ?? 0 ?></td>
-                                <td><?= $order['employee_name']
-                                    ? htmlspecialchars($order['employee_name'])
-                                    : '<span class="text-muted">Not yet assigned</span>' ?></td>
-                                <td><?= $order['expected_completion']
-                                    ? date('M d, Y', strtotime($order['expected_completion']))
-                                    : 'To be determined' ?></td>
-                                <td><span class="badge status <?= strtolower($order['status']) ?>"><?= $order[
-    'status'
-] ?></span></td>
-                                <td><span class="badge status <?= strtolower($order['payment_status']) ?>"><?= $order[
-    'payment_status'
-] ?></span></td>
-                                <td>
-                                    <button type="button" class="btn-view" onclick="viewOrder(<?= $order[
-                                        'order_id'
-                                    ] ?>)">View</button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+<?php
+// ── Build order cards ──
+$ordersHtml = '';
+if (empty($orders)):
+  $ordersHtml = renderEmptyState('fas fa-inbox', 'No orders yet',
+    'Place your first bulk order and track it here from start to finish.',
+    ['label' => 'Place Your First Order', 'href' => 'place_order.php', 'icon' => 'fas fa-plus']);
+else:
+  ob_start();
+  foreach ($orders as $o):
+    $stage = $o['stage'] ?? '';
+    $cs = $CUSTOMER_STAGE_MAP[$stage] ?? 'Processing';
+    $pct = getStageProgress($stage);
+    $stageColor = $STAGE_CONFIG[$stage]['color'] ?? 'var(--role-accent)';
+    $pcVariant = strtolower($o['payment_status'] ?? 'pending') === 'paid' ? 'success' : 'warning';
+    $completion = $o['expected_completion'] ? date('M j, Y', strtotime($o['expected_completion'])) : 'TBD';
+    $staffName = $o['employee_name'] ? htmlspecialchars($o['employee_name']) : 'Not assigned';
+    $designType = in_array($o['service_category'] ?? '', ['Embroidery', 'Screen Printing']) ? 'Standard' : 'Custom';
+?>
+<a href="view_order.php?id=<?= $o['order_id'] ?>" style="text-decoration:none;display:block;margin-bottom:16px">
+  <div class="task-card" style="border-left:4px solid <?= $stageColor ?>">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.05rem;font-weight:700;color:var(--text-primary)">#ORD-<?= $o['order_id'] ?></span>
+          <span style="font-size:0.85rem;color:var(--text-secondary)"><?= htmlspecialchars($o['service_name'] ?? '') ?></span>
         </div>
+        <div style="font-size:0.78rem;color:var(--text-tertiary);margin-top:2px">
+          <?= date('M d, Y', strtotime($o['order_date'])) ?> · <?= $designType ?> · Qty: <?= (int)($o['total_quantity'] ?? 0) ?>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <?= renderStatusBadge(htmlspecialchars($cs), 'accent', 'sm') ?>
+        <?= renderStatusBadge(htmlspecialchars($o['payment_status'] ?? 'Pending'), $pcVariant, 'sm') ?>
+      </div>
     </div>
-</div>
 
-<!-- Order Details Modal -->
-<div id="orderModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title">Order #<span id="modalOrderId"></span></h5>
-            <button type="button" class="close-modal" onclick="closeModal()">&times;</button>
+    <!-- Visual timeline dots for the 5 simplified stages -->
+    <?php
+    $tlStages = ['Order Confirmed', 'In Production', 'Quality Check', 'Ready for Pickup', 'Completed'];
+    $currentIdx = array_search($cs, $tlStages);
+    if ($currentIdx === false) $currentIdx = 0;
+    ?>
+    <div style="display:flex;gap:4px;margin-bottom:12px">
+      <?php foreach ($tlStages as $i => $s):
+        $dotClass = $i < $currentIdx ? 'is-complete' : ($i === $currentIdx ? 'is-active' : 'is-pending');
+      ?>
+      <div style="flex:1;text-align:center">
+        <div class="timeline-dot <?= $dotClass ?>" style="width:20px;height:20px;margin:0 auto;font-size:0.5rem">
+          <?php if ($i < $currentIdx): ?><i class="fas fa-check"></i><?php endif; ?>
         </div>
-        <div class="modal-body" id="orderModalContent">
-            <!-- Content will be loaded dynamically -->
-            <div class="loading-indicator">
-                <div class="spinner"></div>
-                <p>Loading order details...</p>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="modal-btn" onclick="closeModal()">Close</button>
-        </div>
+        <div style="font-size:0.6rem;color:var(--text-tertiary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= $s ?></div>
+      </div>
+      <?php endforeach; ?>
     </div>
-</div>
 
-<script src="/public/assets/js/order.js"></script>
+    <!-- Progress bar -->
+    <div class="progress-bar" style="margin-bottom:8px">
+      <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= $pct ?>%;background:<?= $stageColor ?>"></div></div>
+      <span class="progress-bar-label"><?= $pct ?>%</span>
+    </div>
 
+    <!-- Meta info row -->
+    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:0.78rem;color:var(--text-tertiary)">
+      <span><i class="fas fa-user"></i> <?= $staffName ?></span>
+      <span><i class="fas fa-calendar"></i> Due: <?= $completion ?></span>
+      <span><i class="fas fa-tag"></i> ₱<?= number_format($o['total_price'] ?? 0, 2) ?></span>
+    </div>
+  </div>
+</a>
+<?php
+  endforeach;
+  $ordersHtml = ob_get_clean();
+endif;
+
+echo renderDashboardShell(
+  renderPageHeader(
+    'My Orders',
+    'Track every order from placement to pickup',
+    '',
+    [['label' => 'Place New Order', 'href' => 'place_order.php', 'icon' => 'fas fa-plus', 'variant' => 'primary', 'size' => 'sm']]
+  ),
+  '',
+  $ordersHtml
+);
+?>
     </div>
   </div>
 </div>
 
-<script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
-});
-</script>
+<script src="/public/assets/js/order.js"></script>
 </body>
 </html>
-
-

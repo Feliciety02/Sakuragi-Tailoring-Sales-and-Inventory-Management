@@ -1,11 +1,14 @@
 <?php
 require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
+require_once __DIR__ . '/../../../../config/db_connect.php';
+require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once '../../../../app/Middleware/auth_required.php';
-require_once '../../../../config/db_connect.php';
 
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Senior Tailor';
+$firstName = htmlspecialchars(explode(' ', $full_name)[0]);
+
 try {
     $userSql = "SELECT e.position_id FROM employees e WHERE e.user_id = ?";
     $userStmt = $pdo->prepare($userSql);
@@ -28,171 +31,136 @@ try {
     exit();
 }
 
-// Stats (placeholder for now - integrate real queries later)
-$passedToday = $pdo->query("SELECT COUNT(*) FROM qc_inspections WHERE inspector_id = $user_id AND DATE(inspected_at) = CURDATE() AND result = 'Passed'")->fetchColumn() ?: 0;
-$failedToday = $pdo->query("SELECT COUNT(*) FROM qc_inspections WHERE inspector_id = $user_id AND DATE(inspected_at) = CURDATE() AND result = 'Failed'")->fetchColumn() ?: 0;
+$pageTitle = 'Quality Workspace';
+
+// Stats (real DB queries)
+$stmtPassed = $pdo->prepare("SELECT COUNT(*) FROM qc_inspections WHERE inspector_id = ? AND DATE(inspected_at) = CURDATE() AND result = 'Passed'");
+$stmtPassed->execute([$user_id]);
+$passedToday = $stmtPassed->fetchColumn() ?: 0;
+$stmtFailed = $pdo->prepare("SELECT COUNT(*) FROM qc_inspections WHERE inspector_id = ? AND DATE(inspected_at) = CURDATE() AND result = 'Failed'");
+$stmtFailed->execute([$user_id]);
+$failedToday = $stmtFailed->fetchColumn() ?: 0;
 $pendingCount = $pdo->query("SELECT COUNT(*) FROM order_workflow WHERE stage = 'Quality Inspection'")->fetchColumn() ?: 0;
-$pageTitle = 'Senior Tailor Dashboard';
-?>
-<!DOCTYPE html>
+
+// Next item to inspect
+$nextItem = $pdo->query("
+  SELECT o.order_id, ow.product_type, ow.priority,
+         u.full_name AS customer_name, e.full_name AS employee_name
+  FROM order_workflow ow
+  JOIN orders o ON ow.order_id = o.order_id
+  JOIN users u ON o.user_id = u.user_id
+  LEFT JOIN users e ON ow.assigned_employee = e.user_id
+  WHERE ow.stage = 'Quality Inspection'
+  ORDER BY ow.expected_completion ASC LIMIT 1
+")->fetch();
+
+// Recent inspections
+$stmtRecent = $pdo->prepare("
+  SELECT qc.inspection_id, qc.result, qc.inspected_at, o.order_id
+  FROM qc_inspections qc
+  JOIN orders o ON qc.order_id = o.order_id
+  WHERE qc.inspector_id = ?
+  ORDER BY qc.inspected_at DESC LIMIT 5
+");
+$stmtRecent->execute([$user_id]);
+$recentInspections = $stmtRecent->fetchAll();
+?><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Senior Tailor Dashboard — Sakuragi</title>
-  <link rel="icon" type="image/png" href="/public/assets/images/sakuragi-logo.png" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Quality Workspace — Sakuragi</title>
+  <link rel="icon" type="image/svg+xml" href="/public/assets/images/sakuragi-logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="apple-touch-icon" href="/public/assets/images/sakuragi-logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
-  <style>
-    .st-card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; transition: .2s; }
-    .st-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-    .st-metric { display: flex; align-items: center; gap: 1rem; }
-    .st-metric-icon { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .st-metric-icon.passed { background: rgba(40,167,69,.15); color: #28a745; }
-    .st-metric-icon.failed { background: rgba(220,53,69,.15); color: #dc3545; }
-    .st-metric-icon.pending { background: rgba(255,193,7,.15); color: #ffc107; }
-    .st-metric-value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
-    .st-metric-label { font-size: .8rem; color: var(--text-secondary); }
-    .st-next-item { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; }
-    .st-item-details { display: flex; align-items: center; gap: 1rem; }
-    .st-item-image { width: 64px; height: 64px; border-radius: var(--radius-md); background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text-tertiary); }
-    .st-item-info { flex: 1; }
-    .st-item-id { font-weight: 700; font-size: .95rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-    .st-item-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 2px 0; }
-    .st-item-meta { font-size: .8rem; color: var(--text-secondary); }
-    .st-priority { display: inline-flex; align-items: center; gap: 4px; background: rgba(220,53,69,.1); color: #dc3545; padding: 2px 10px; border-radius: 100px; font-size: .75rem; font-weight: 600; }
-    .st-action-btn { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: .85rem; cursor: pointer; transition: .2s; display: inline-flex; align-items: center; gap: 6px; }
-    .st-action-btn:hover { background: var(--accent-blue); }
-    .st-perf { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; }
-    .st-perf-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 2px; }
-    .st-perf-sub { font-size: .8rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
-    .st-progress-item { margin-bottom: 1rem; }
-    .st-progress-label { display: flex; justify-content: space-between; font-size: .85rem; color: var(--text-secondary); margin-bottom: 6px; }
-    .st-progress-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-    .st-progress-fill { height: 100%; border-radius: 4px; }
-    .st-activity-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
-    .st-activity-item:last-child { border-bottom: none; }
-    .st-activity-left { display: flex; align-items: center; gap: 10px; }
-    .st-activity-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    @media (max-width: 768px) { .st-item-details { flex-direction: column; align-items: flex-start; } }
-  </style>
+  <link rel="stylesheet" href="/public/assets/css/components.css" />
 </head>
-<body>
+<body data-role="senior_tailor">
 <div class="dash-layout">
   <?php require_once '../../../../app/Views/Shared/Sidebars/senior_tailor.php'; ?>
   <div class="dash-main">
-    <?php require_once '../../../../app/Views/Shared/topnav.php'; ?>
-    <div class="dash-content">
-      <div class="page-header">
-        <h1>Welcome, <?= htmlspecialchars(explode(' ', $full_name)[0]) ?></h1>
-        <p><?= date('l, F j, Y') ?> · Senior Tailor Dashboard</p>
-      </div>
+<?php
+// ── Build next item card ──
+$nextItemHtml = '';
+if ($nextItem):
+  ob_start();
+?>
+<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+  <div style="width:48px;height:48px;border-radius:12px;background:var(--role-accent-soft);color:var(--role-accent);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">
+    <i class="fas fa-tshirt"></i>
+  </div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <strong style="font-size:0.95rem">QC-<?= $nextItem['order_id'] ?></strong>
+      <span style="font-size:0.78rem;color:var(--text-tertiary)">Order #ORD-<?= $nextItem['order_id'] ?></span>
+      <?php if ($nextItem['priority'] === 'urgent' || $nextItem['priority'] === 'high'):
+        echo renderStatusBadge(ucfirst($nextItem['priority']), 'danger', 'sm');
+      endif; ?>
+    </div>
+    <div style="font-size:0.85rem;font-weight:600;margin:2px 0"><?= htmlspecialchars($nextItem['product_type'] ?? 'Garment Item') ?></div>
+    <div style="font-size:0.78rem;color:var(--text-tertiary)">Crafted by: <?= htmlspecialchars($nextItem['employee_name'] ?? 'Unassigned') ?></div>
+  </div>
+  <a href="item-to-inspect.php" class="dash-btn dash-btn-accent"><i class="fas fa-arrow-right"></i> Start Inspection</a>
+</div>
+<?php
+  $nextItemHtml = ob_get_clean();
+else:
+  $nextItemHtml = renderEmptyState('fas fa-check-circle', 'No items pending inspection', 'All items have been reviewed.');
+endif;
 
-      <!-- Status Cards -->
-      <div class="kpi-row">
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#d1fae5;color:#059669"><i class="fas fa-check-circle"></i></div>
-          <div class="kpi-label">Items Passed Today</div>
-          <div class="kpi-value"><?= $passedToday ?></div>
-          <div class="kpi-change">Approved</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#fee2e2;color:#dc2626"><i class="fas fa-times-circle"></i></div>
-          <div class="kpi-label">Items Failed</div>
-          <div class="kpi-value"><?= $failedToday ?></div>
-          <div class="kpi-change" style="color:var(--accent-red)">Requiring attention</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background:#fef3c7;color:#d97706"><i class="fas fa-hourglass-half"></i></div>
-          <div class="kpi-label">Pending Inspections</div>
-          <div class="kpi-value"><?= $pendingCount ?></div>
-          <div class="kpi-change" style="color:var(--text-tertiary)">Waiting for review</div>
-        </div>
-      </div>
+// ── Build performance metrics ──
+$perfBody = '<p class="perf-sub" style="font-size:0.8rem;color:var(--text-tertiary);margin-bottom:14px">Quality check efficiency</p>';
+$perfBody .= '<div class="metric-item" style="margin-bottom:12px">';
+$perfBody .= '<div class="metric-label" style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px"><span>Inspection Rate</span><span>75%</span></div>';
+$perfBody .= '<div class="metric-bar" style="height:6px;background:var(--surface-secondary);border-radius:3px;overflow:hidden"><div style="height:100%;width:75%;background:var(--role-accent);border-radius:3px"></div></div>';
+$perfBody .= '</div>';
+$perfBody .= '<div class="metric-item" style="margin-bottom:12px">';
+$perfBody .= '<div class="metric-label" style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px"><span>Pass Rate</span><span>80%</span></div>';
+$perfBody .= '<div class="metric-bar" style="height:6px;background:var(--surface-secondary);border-radius:3px;overflow:hidden"><div style="height:100%;width:80%;background:var(--color-success);border-radius:3px"></div></div>';
+$perfBody .= '</div>';
+$perfBody .= '<div class="metric-item">';
+$perfBody .= '<div class="metric-label" style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px"><span>Accuracy</span><span>95%</span></div>';
+$perfBody .= '<div class="metric-bar" style="height:6px;background:var(--surface-secondary);border-radius:3px;overflow:hidden"><div style="height:100%;width:95%;background:var(--color-info);border-radius:3px"></div></div>';
+$perfBody .= '</div>';
 
-      <!-- Next Item to Inspect -->
-      <div class="panel-card" style="margin-bottom:24px">
-        <h3><i class="fas fa-binoculars" style="color:var(--accent-blue)"></i> Next Item to Inspect</h3>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-          <div style="width:64px;height:64px;border-radius:var(--radius-md);background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-tertiary);font-size:1.5rem">
-            <i class="fas fa-tshirt"></i>
-          </div>
-          <div style="flex:1;min-width:200px">
-            <div style="font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              QC-5237 <span style="font-weight:400;font-size:.8rem;color:var(--text-secondary)">Order #ORD-7982</span>
-            </div>
-            <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin:2px 0">Wool Suit Jacket</div>
-            <div style="font-size:.8rem;color:var(--text-secondary)">Crafted by: Marcus Wilson</div>
-            <span class="qc-status failed" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px"><i class="fas fa-star"></i> High priority</span>
-          </div>
-          <a href="item-to-inspect.php" class="dash-btn dash-btn-primary"><i class="fas fa-arrow-right"></i> Start Inspection</a>
-        </div>
-      </div>
+// ── Build activity feed ──
+$activityItems = [];
+foreach ($recentInspections as $ri):
+  $dotColor = $ri['result'] === 'Passed' ? 'var(--color-success)' : ($ri['result'] === 'Failed' ? 'var(--color-danger)' : 'var(--color-warning)');
+  $activityItems[] = [
+    'title' => 'QC-' . $ri['order_id'],
+    'description' => htmlspecialchars(ucfirst($ri['result'] ?? 'Pending')),
+    'time' => $ri['inspected_at'] ? date('g:i A', strtotime($ri['inspected_at'])) : '—',
+    'dotColor' => $dotColor,
+  ];
+endforeach;
 
-      <!-- Bottom Section -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
-        <!-- Performance -->
-        <div class="panel-card">
-          <h3><i class="fas fa-chart-line" style="color:var(--accent-emerald)"></i> Today's Performance</h3>
-          <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:1.5rem">Quality check efficiency</p>
-          <div style="margin-bottom:1rem">
-            <div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--text-secondary);margin-bottom:6px">
-              <span>Inspection Rate</span><span>75%</span>
-            </div>
-            <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden">
-              <div style="width:75%;height:100%;border-radius:4px;background:var(--accent-blue)"></div>
-            </div>
-          </div>
-          <div style="margin-bottom:1rem">
-            <div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--text-secondary);margin-bottom:6px">
-              <span>Pass Rate</span><span>80%</span>
-            </div>
-            <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden">
-              <div style="width:80%;height:100%;border-radius:4px;background:var(--accent-emerald)"></div>
-            </div>
-          </div>
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--text-secondary);margin-bottom:6px">
-              <span>Accuracy</span><span>95%</span>
-            </div>
-            <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden">
-              <div style="width:95%;height:100%;border-radius:4px;background:var(--accent-cyan)"></div>
-            </div>
-          </div>
-        </div>
+// ── Sidebar panels ──
+$sidebarPanels = renderPanelCard('Today\'s Performance', $perfBody, 'fas fa-chart-line')
+    . renderPanelCard('Recent Activity', renderActivityFeed($activityItems, ['emptyMessage' => 'No inspections performed today']), 'fas fa-clock');
 
-        <!-- Recent Activity -->
-        <div class="panel-card">
-          <h3><i class="fas fa-clock" style="color:var(--accent-purple)"></i> Recent Activity</h3>
-          <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:1rem">Latest inspection results</p>
-          <div class="activity-item">
-            <span class="dot" style="background:var(--accent-emerald)"></span>
-            <div class="text"><strong>QC-5236</strong> Dress Shirt <div class="time">10:02 AM</div></div>
-          </div>
-          <div class="activity-item">
-            <span class="dot" style="background:var(--accent-red)"></span>
-            <div class="text"><strong>QC-5235</strong> Silk Blouse <div class="time">10:15 AM</div></div>
-          </div>
-          <div class="activity-item">
-            <span class="dot" style="background:var(--accent-emerald)"></span>
-            <div class="text"><strong>QC-5234</strong> Formal Trousers <div class="time">9:58 AM</div></div>
-          </div>
-          <div class="activity-item">
-            <span class="dot" style="background:var(--accent-amber)"></span>
-            <div class="text"><strong>QC-5233</strong> Cashmere Sweater <div class="time">9:30 AM</div></div>
-          </div>
-        </div>
-      </div>
-
+echo renderDashboardShell(
+  renderPageHeader(
+    'Quality Workspace',
+    "Welcome, {$firstName} · " . date('l, F j, Y'),
+    ''),
+  renderKPIRow([
+    ['icon' => 'fas fa-check-circle',   'label' => 'Items Passed Today', 'value' => $passedToday,  'accent' => 'green'],
+    ['icon' => 'fas fa-times-circle',   'label' => 'Items Failed',      'value' => $failedToday,  'accent' => 'red'],
+    ['icon' => 'fas fa-hourglass-half', 'label' => 'Pending Inspections','value' => $pendingCount, 'accent' => 'amber'],
+  ]),
+  renderPageSection('Next Item to Inspect', $nextItemHtml, 'fas fa-binoculars')
+);
+echo renderTwoColumn(
+  renderPageSection('Performance', $perfBody, 'fas fa-chart-line'),
+  renderPageSection('Recent Activity', renderActivityFeed($activityItems, ['emptyMessage' => 'No inspections performed today']), 'fas fa-clock')
+);
+?>
     </div>
   </div>
 </div>
-
-<script>
-document.getElementById('menuToggle')?.addEventListener('click', function() {
-  document.getElementById('sidebar')?.classList.toggle('collapsed');
-});
-</script>
 </body>
 </html>

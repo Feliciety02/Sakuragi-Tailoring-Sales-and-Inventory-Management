@@ -1,207 +1,238 @@
 /* ========== TABLE CONTROLS ========== */
 .table-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    margin: 1.5rem 0;
-    gap: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 1.5rem 0;
+  gap: 1rem;
 }
 
 .filters {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .input-wrapper,
 .select-wrapper {
-    position: relative;
-    display: inline-block;
+  position: relative;
+  display: inline-block;
 }
 
 .input-wrapper i,
 .select-wrapper i {
-    position: absolute;
-    top: 50%;
-    left: 12px;
-    transform: translateY(-50%);
-    color: #aaa;
-    pointer-events: none;
-    font-size: 16px;
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+  font-size: 0.9rem;
 }
 
 /* ========== INPUTS ========== */
 .table-search,
 .table-filter {
-    padding: 10px 12px 10px 38px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    background-color: #fff;
-    transition: all 0.3s ease;
-    min-width: 220px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  padding: 9px 12px 9px 36px;
+  font-size: 0.88rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background-color: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 200px;
+  font-family: inherit;
+  color: #111827;
 }
 
 .table-search:focus,
 .table-filter:focus {
-    border-color: #3498db;
-    outline: none;
-    box-shadow: 0 0 7px rgba(52, 152, 219, 0.4);
+  border-color: #b91c1c;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
 }
 
 /* ========== EXPORT BUTTON ========== */
 .btn-export {
-    background-color: #3498db;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 20px;
-    font-size: 0.95rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 3px 8px rgba(52,152,219,0.15);
-    transition: background-color 0.3s ease, transform 0.2s ease;
+  background-color: #b91c1c;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .btn-export:hover {
-    background-color: #2980b9;
-    transform: translateY(-2px);
+  background-color: #991b1b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.2);
 }
 
 /* ========== TABLE CONTAINER ========== */
 .table-responsive {
-    overflow-x: auto;
-    border-radius: 10px;
-    margin-top: 1rem;
-    box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+  overflow-x: auto;
+  border-radius: 12px;
+  margin-top: 1rem;
+  border: 1px solid #eef0f2;
+  background: #fff;
 }
 
 /* ========== TABLE ========== */
 table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-    min-width: 720px;
-    border-radius: 10px;
-    overflow: hidden;
-    background-color: #fff;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 720px;
+  background-color: #fff;
 }
 
 thead {
-    background: linear-gradient(90deg, #3498db, #2980b9);
-    color: #fff;
+  background: #f9fafb;
+  border-bottom: 1px solid #eef0f2;
 }
 
 thead th {
-    padding: 14px 18px;
-    text-align: left;
-    font-weight: 600;
-    position: sticky;
-    top: 0;
-    background: inherit;
-    z-index: 2;
-    cursor: pointer;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 2;
+  cursor: pointer;
+  user-select: none;
+}
+
+thead th:hover {
+  color: #374151;
 }
 
 tbody tr {
-    transition: all 0.2s ease;
+  transition: background 0.12s ease;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-tbody tr:nth-child(even) {
-    background-color: #f9fbfd;
+tbody tr:last-child {
+  border-bottom: none;
 }
 
 tbody tr:hover {
-    background-color: #eef3f7;
-    transform: scale(1.002);
+  background: #fafbfc;
 }
 
 td {
-    padding: 14px 18px;
-    vertical-align: middle;
-    color: #444;
-    line-height: 1.6;
+  padding: 12px 16px;
+  vertical-align: middle;
+  color: #374151;
+  line-height: 1.5;
 }
 
 /* ========== AVATAR ========== */
 img.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: 10px;
-    vertical-align: middle;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  vertical-align: middle;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
-/* ========== STATUS BADGES ========== */
+/* ========== BADGES ========== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 100px;
+  line-height: 1.4;
+}
+
+.badge-blue { background: #eef2ff; color: #4f46e5; }
+.badge-green { background: #d1fae5; color: #065f46; }
+.badge-yellow { background: #fef3c7; color: #92400e; }
+.badge-red { background: #fef2f2; color: #991b1b; }
+.badge-gray { background: #f3f4f6; color: #6b7280; }
+
 .status {
-    padding: 6px 16px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: 50px;
-    display: inline-block;
-    color: #fff;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 100px;
+  line-height: 1.4;
+  color: #fff;
 }
 
 .status.active,
-.status.employed { background-color: #2980b9; }
-
-.status.hired { background-color: #27ae60; }
-
-.status.absent { background-color: #e74c3c; }
+.status.employed { background: #4f46e5; }
+.status.hired { background: #059669; }
+.status.absent { background: #dc2626; }
 
 /* ========== ACTION BUTTONS ========== */
 .action-buttons {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-start;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-start;
 }
 
-.action-buttons button {
-    border: none;
-    padding: 8px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    color: #fff;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.action-buttons button,
+.action-buttons a {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  color: #6b7280;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  text-decoration: none;
+  font-family: inherit;
 }
 
-button.edit { background-color: #f39c12; }
-button.edit:hover { background-color: #e67e22; transform: translateY(-1px); }
+.action-buttons button:hover,
+.action-buttons a:hover {
+  transform: translateY(-1px);
+}
 
-button.delete { background-color: #e74c3c; }
-button.delete:hover { background-color: #c0392b; transform: translateY(-1px); }
+button.edit:hover { background: #fef3c7; color: #92400e; }
+button.delete:hover { background: #fef2f2; color: #991b1b; }
+button.view:hover, a.view:hover { background: #eef2ff; color: #4f46e5; }
 
-button.view { background-color: #16a085; }
-button.view:hover { background-color: #1abc9c; transform: translateY(-1px); }
-
-/* ========== ANIMATION TRANSITIONS ========== */
+/* ========== ANIMATION ========== */
 input, select, button {
-    transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
-/* ========== MOBILE RESPONSIVE HIDING ========== */
+/* ========== MOBILE ========== */
 @media (max-width: 768px) {
-    table {
-        font-size: 0.85rem;
-        min-width: 600px;
-    }
+  table {
+    font-size: 0.82rem;
+    min-width: 600px;
+  }
 
-    td:nth-child(3),
-    th:nth-child(3),
-    td:nth-child(4),
-    th:nth-child(4) {
-        display: none;
-    }
+  td:nth-child(3),
+  th:nth-child(3),
+  td:nth-child(4),
+  th:nth-child(4) {
+    display: none;
+  }
 }
