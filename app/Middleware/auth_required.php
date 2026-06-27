@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../../config/session_handler.php';
+require_once __DIR__ . '/../bootstrap.php';
 
 if (!is_logged_in()) {
     // If not logged in, redirect to login page

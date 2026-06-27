@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -56,8 +57,11 @@ foreach ($pendingReviews as $r) {
     $pendingOrders[$r['order_id']] = $r;
 }
 if (!empty($pendingOrders)) {
-    $orderIds = implode(',', array_keys($pendingOrders));
-    $photos = $pdo->query("SELECT * FROM sample_photos WHERE order_id IN ($orderIds) ORDER BY uploaded_at ASC")->fetchAll();
+    $orderIds = array_keys($pendingOrders);
+    $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+    $photosStmt = $pdo->prepare("SELECT * FROM sample_photos WHERE order_id IN ($placeholders) ORDER BY uploaded_at ASC");
+    $photosStmt->execute($orderIds);
+    $photos = $photosStmt->fetchAll();
     $photosByOrder = [];
     foreach ($photos as $p) {
         $photosByOrder[$p['order_id']][] = $p;
@@ -123,13 +127,13 @@ $pageTitle = 'Sample Review';
 </head>
 <body data-role="customer">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $alertHtml = '';
 if ($msg):
   $isError = stripos($msg, 'Error') !== false || stripos($msg, 'rejected') !== false;
-  $alertHtml = '<div style="background:' . ($isError ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)') . ';border:1px solid ' . ($isError ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)') . ';color:' . ($isError ? 'var(--color-danger)' : 'var(--color-success)') . ';border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;font-size:.85rem"><i class="fas ' . ($isError ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($msg) . '</div>';
+  $alertHtml = '<div class="dash-alert ' . ($isError ? 'dash-alert-danger' : 'dash-alert-success') . '"><i class="fas ' . ($isError ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($msg) . '</div>';
 endif;
 
 $kpiRow = renderKPIRow([
@@ -199,18 +203,18 @@ endif;
 $historyHtml = '';
 if ($reviewHistory->rowCount() > 0):
   $cols = [
-    ['field' => 'order_link', 'label' => 'Order #', 'safeHtml' => true],
+    ['field' => 'order_link', 'label' => 'Order #', 'type' => 'link'],
     ['field' => 'product', 'label' => 'Product'],
-    ['field' => 'status', 'label' => 'Status', 'safeHtml' => true],
+    ['field' => 'status', 'label' => 'Status', 'type' => 'badge'],
     ['field' => 'date', 'label' => 'Reviewed'],
   ];
   $dataRows = [];
   foreach ($reviewHistory as $h):
     $hVariant = $h['status'] === 'approved' ? 'success' : 'danger';
     $dataRows[] = [
-      'order_link' => '<a href="view_order.php?id=' . $h['order_id'] . '" style="color:var(--role-accent);text-decoration:none;font-weight:600">#ORD-' . $h['order_id'] . '</a>',
+      'order_link' => ['href' => 'view_order.php?id=' . $h['order_id'], 'label' => '#ORD-' . $h['order_id']],
       'product' => htmlspecialchars($h['product_type'] ?? 'Garment'),
-      'status' => renderStatusBadge(htmlspecialchars($h['status']), $hVariant, 'sm'),
+      'status' => ['text' => $h['status'], 'variant' => $hVariant],
       'date' => date('M d, Y', strtotime($h['reviewed_at'])),
     ];
   endforeach;

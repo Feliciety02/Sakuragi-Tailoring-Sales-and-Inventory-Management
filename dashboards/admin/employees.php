@@ -54,7 +54,7 @@ $pageTitle = 'Manage Employees';
 </head>
 <body data-role="admin">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/admin.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 if (empty($result)):
@@ -216,3 +216,8 @@ echo renderDashboardShell(
   '',
   $tableContent . $scriptsHtml
 );
+?>
+</div>
+</div>
+</body>
+</html>

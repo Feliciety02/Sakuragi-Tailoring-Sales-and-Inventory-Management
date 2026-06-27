@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/role_admin_only.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 $saveMessage = '';
 $saveError = '';
@@ -62,12 +63,12 @@ $pageTitle = 'Shop Settings';
 </head>
 <body data-role="admin">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/admin.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $alerts = '';
-if ($saveMessage) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:#22c55e;font-size:0.85rem"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($saveMessage) . '</div>';
-if ($saveError) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#ef4444;font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($saveError) . '</div>';
+if ($saveMessage) $alerts .= '<div class="dash-alert dash-alert-success"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($saveMessage) . '</div>';
+if ($saveError) $alerts .= '<div class="dash-alert dash-alert-danger"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($saveError) . '</div>';
 
 ob_start();
 ?>
@@ -122,3 +123,8 @@ echo renderDashboardShell(
   '',
   $alerts . $formHtml . '<script>document.getElementById(\'menuToggle\')?.addEventListener(\'click\', function() { document.getElementById(\'sidebar\')?.classList.toggle(\'collapsed\'); });</script>'
 );
+?>
+</div>
+</div>
+</body>
+</html>

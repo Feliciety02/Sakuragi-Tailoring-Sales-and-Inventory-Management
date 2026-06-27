@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once '../../../../app/Middleware/auth_required.php';
 require_once '../../../../config/db_connect.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $user_id = $_SESSION['user_id'];
 try {
@@ -69,7 +70,7 @@ $totalCount = count($itemsList);
 </head>
 <body data-role="senior_tailor">
 <div class="dash-layout">
-  <?php require_once '../../../../app/Views/Shared/Sidebars/senior_tailor.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 // Build table columns

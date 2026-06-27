@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 $pageTitle = 'Assigned Orders';
 
@@ -48,7 +49,7 @@ $role = get_user_role();
 </head>
 <body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 if (empty($result)):

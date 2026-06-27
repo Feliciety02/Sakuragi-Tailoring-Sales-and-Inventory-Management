@@ -1,69 +1,62 @@
-// tables.js
-
-// Generic search by row text content
 function filterTableBySearch(inputId, tableId) {
-    const input = document.getElementById(inputId).value.toLowerCase();
-    const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+    const input = document.getElementById(inputId);
+    const tableInput = document.getElementById(tableId + '-search');
+    const target = tableInput || input;
 
-    rows.forEach(row => {
-        const rowText = row.textContent.toLowerCase();
-        row.style.display = rowText.includes(input) ? "" : "none";
-    });
+    if (target && input && target !== input) {
+        target.value = input.value;
+    }
+
+    target?.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-// Filter by status column (expects <span class="status"> text)
-function filterTableByStatus(selectId, tableId, statusClass = "status") {
-    const selected = document.getElementById(selectId).value.toLowerCase();
-    const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+function filterTableByStatus(selectId, tableId) {
+    const source = document.getElementById(selectId);
+    const wrapper = document.getElementById(tableId)?.closest('.data-table-wrapper');
+    const columnSelect = wrapper?.querySelector('.dt-filter-column');
+    const valueSelect = wrapper?.querySelector('.dt-filter-value');
 
-    rows.forEach(row => {
-        const status = row.querySelector(`.${statusClass}`);
-        const value = status ? status.textContent.toLowerCase() : "";
-        row.style.display = selected === "" || value === selected ? "" : "none";
-    });
-}
+    if (!source || !columnSelect || !valueSelect) {
+        return;
+    }
 
-// Sort table column (basic text sort)
-function sortTableByColumn(tableId, columnIndex) {
-    const table = document.getElementById(tableId);
-    const rows = Array.from(table.rows).slice(1);
-    let switching = true;
-    let dir = "asc";
-
-    while (switching) {
-        switching = false;
-        for (let i = 0; i < rows.length - 1; i++) {
-            let x = rows[i].cells[columnIndex].innerText.toLowerCase();
-            let y = rows[i + 1].cells[columnIndex].innerText.toLowerCase();
-            let shouldSwitch = dir === "asc" ? x > y : x < y;
-
-            if (shouldSwitch) {
-                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                switching = true;
-                break;
-            }
-        }
-        if (!switching && dir === "asc") {
-            dir = "desc";
-            switching = true;
+    if (!columnSelect.value) {
+        const statusHeader = Array.from(document.querySelectorAll('#' + tableId + ' thead th')).find(function (th) {
+            return (th.textContent || '').toLowerCase().includes('status');
+        });
+        if (statusHeader) {
+            columnSelect.value = statusHeader.dataset.columnIndex || '';
+            columnSelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
+
+    valueSelect.value = source.value;
+    valueSelect.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-// Export to CSV
-function exportTableToCSV(tableId, filename = "export.csv") {
+function sortTableByColumn(tableId, columnIndex) {
+    const header = document.querySelector('#' + tableId + ' thead th[data-column-index="' + columnIndex + '"]');
+    header?.click();
+}
+
+function exportTableToCSV(tableId, filename = 'export.csv') {
+    if (window.SakuragiDataTable) {
+        window.SakuragiDataTable.exportTable(tableId, 'csv');
+        return;
+    }
+
     const rows = document.querySelectorAll(`#${tableId} tr`);
     const csv = [];
 
     rows.forEach(row => {
-        const cols = row.querySelectorAll("th, td");
-        const rowData = Array.from(cols).map(col => `"${col.innerText.trim()}"`);
-        csv.push(rowData.join(","));
+        const cols = row.querySelectorAll('th, td');
+        const rowData = Array.from(cols).map(col => `"${(col.innerText || '').trim().replace(/"/g, '""')}"`);
+        csv.push(rowData.join(','));
     });
 
-    const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     a.click();

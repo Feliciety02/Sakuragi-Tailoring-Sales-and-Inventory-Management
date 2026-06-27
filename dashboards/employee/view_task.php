@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 $pageTitle = 'View Task';
 
@@ -115,7 +116,7 @@ $role = get_user_role();
 </head>
 <body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $breadcrumb = '<div style="font-size:0.78rem;color:var(--text-tertiary);margin-bottom:8px"><a href="dashboard.php" style="color:var(--role-accent);text-decoration:none">Dashboard</a> <span style="margin:0 4px">/</span> <a href="my_tasks.php" style="color:var(--role-accent);text-decoration:none">My Tasks</a> <span style="margin:0 4px">/</span> <span style="color:var(--text-primary)">#ORD-' . $order_id . '</span></div>';

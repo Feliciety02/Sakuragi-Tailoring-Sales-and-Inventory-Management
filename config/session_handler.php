@@ -36,11 +36,9 @@ function redirect_if_logged_in() {
             case 'inventory_manager':
             case 'quality_control_inspector':
                 $target = '/dashboards/employee/dashboard.php';
-                $dbPath = __DIR__ . '/db_connect.php';
-                $helperPath = __DIR__ . '/../app/Support/helpers.php';
-                if (file_exists($dbPath) && file_exists($helperPath)) {
-                    require_once $dbPath;
-                    require_once $helperPath;
+                $bootstrapPath = __DIR__ . '/../app/bootstrap.php';
+                if (file_exists($bootstrapPath)) {
+                    require_once $bootstrapPath;
                     if (isset($pdo) && function_exists('get_role_dashboard_home')) {
                         $target = get_role_dashboard_home($pdo, get_user_role(), (int) ($_SESSION['user_id'] ?? 0));
                     }

@@ -67,11 +67,6 @@ $stage_order = [
     .kanban-card.dragging { opacity:.5 }
     .kanban-column.drag-over { background:var(--role-accent-soft);border-color:var(--role-accent) }
 
-    .priority-urgent { background:#fee2e2;color:#991b1b }
-    .priority-high { background:#fef3c7;color:#92400e }
-    .priority-medium { background:#dbeafe;color:#1e40af }
-    .priority-low { background:#f3f4f6;color:#4b5563 }
-
     @media (max-width:768px) {
       .kanban-column { min-width:240px;max-width:260px }
     }
@@ -179,7 +174,7 @@ function renderCard(o) {
     + \'</div>\'
     + \'<div class="order-id">#ORD-\' + o.order_id + overdue + \'</div>\'
     + \'<div class="customer-name">\' + escapeHtml(o.customer_name || \'\') + \'</div>\'
-    + \'<div class="meta-row"><span class="priority-badge priority-\' + priority + \'" style="display:inline-flex;align-items:center;gap:3px;font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em">\' + priority + \'</span>\'
+    + \'<div class="meta-row"><span class="priority-badge priority-badge-\' + priority + \'">\' + priority + \'</span>\'
     + \'<span><i class="far fa-calendar-alt"></i> \' + (o.expected_completion ? o.expected_completion.slice(0,10) : \'&mdash;\') + \'</span>\'
     + \'<span>Qty: \' + (o.total_quantity || 0) + \'</span></div>\'
     + \'<div class="meta-row"><span class="assignee"><span class="avatar-sm">\' + initials + \'</span> \' + escapeHtml(empName) + \'</span></div>\'

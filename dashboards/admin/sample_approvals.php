@@ -120,7 +120,7 @@ $pageTitle = 'Sample Approvals';
 $alertHtml = '';
 if ($msg):
   $isErr = strpos($msg, 'Error') !== false;
-  $alertHtml = '<div class="alert-banner" style="background:' . ($isErr ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)') . ';border:1px solid ' . ($isErr ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)') . ';color:' . ($isErr ? '#ef4444' : '#22c55e') . ';border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;font-size:0.85rem"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($msg) . '</div>';
+  $alertHtml = '<div class="dash-alert ' . ($isErr ? 'dash-alert-danger' : 'dash-alert-success') . '"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($msg) . '</div>';
 endif;
 
 // ── KPI Row ──
@@ -317,3 +317,7 @@ echo renderDashboardShell(
   $alertHtml . $mainCol . $scriptsHtml
 );
 ?>
+</div>
+</div>
+</body>
+</html>

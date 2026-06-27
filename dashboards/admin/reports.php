@@ -1,9 +1,6 @@
 <?php
-require_once __DIR__ . '/../../config/session_handler.php';
-require_once __DIR__ . '/../../config/constants.php';
-require_once __DIR__ . '/../../config/db_connect.php';
-require_once __DIR__ . '/../../config/component_helpers.php';
-require_once '../../app/Middleware/role_admin_only.php';
+require_once __DIR__ . '/../../app/bootstrap.php';
+require_once APP_ROOT . '/app/Middleware/role_admin_only.php';
 
 $monthlyReports = $pdo->query("
     SELECT
@@ -66,11 +63,10 @@ else:
       'completed' => (string)$r['completed_orders'],
     ];
   endforeach;
-  $tableContent = renderDataTable('reports-table', $cols, $data, ['searchable' => true, 'searchPlaceholder' => 'Search reports...', 'actions' => [['label' => 'Export CSV', 'icon' => 'fas fa-download', 'href' => '#', 'variant' => 'outline', 'onclick' => "exportTableToCSV('reports-table', 'monthly_reports.csv');return false"]]]);
+  $tableContent = renderDataTable('reports-table', $cols, $data, ['searchable' => true, 'searchPlaceholder' => 'Search reports...']);
 endif;
 
-$tableContent .= '<script src="/public/assets/js/tables.js"></script>
-<script>
+$tableContent .= '<script>
 document.getElementById(\'menuToggle\')?.addEventListener(\'click\', function() {
   document.getElementById(\'sidebar\')?.classList.toggle(\'collapsed\');
 });
@@ -81,3 +77,8 @@ echo renderDashboardShell(
   $metricsRow,
   $tableContent
 );
+?>
+</div>
+</div>
+</body>
+</html>

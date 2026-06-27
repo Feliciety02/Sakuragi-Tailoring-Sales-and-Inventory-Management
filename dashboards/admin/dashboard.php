@@ -178,9 +178,9 @@ echo renderDashboardShell(
      ['label' => 'QC Center', 'href' => 'quality_control.php', 'icon' => 'fas fa-clipboard-check', 'variant' => 'primary', 'size' => 'sm']]
   ),
   renderKPIRow([
-    ['icon' => 'fas fa-shopping-bag',  'label' => 'Total Orders',     'value' => $totalOrders,   'trendLabel' => '↑ 12% this month'],
+    ['icon' => 'fas fa-shopping-bag',  'label' => 'Total Orders',     'value' => $totalOrders,   'trendLabel' => '↑ 12% this month', 'accent' => 'blue'],
     ['icon' => 'fas fa-cog',            'label' => 'In Production',    'value' => $inProduction,  'trendLabel' => "{$overdueCount} overdue", 'accent' => 'amber'],
-    ['icon' => 'fas fa-clipboard-check','label' => 'Waiting for QC',  'value' => $inQC,          'trendLabel' => 'Needs review'],
+    ['icon' => 'fas fa-clipboard-check','label' => 'Waiting for QC',  'value' => $inQC,          'trendLabel' => 'Needs review', 'accent' => 'purple'],
     ['icon' => 'fas fa-check-circle',   'label' => 'Completed Today',  'value' => $completedToday,'trendLabel' => "+{$completedToday} today", 'accent' => 'green'],
   ]),
   renderPageSection(

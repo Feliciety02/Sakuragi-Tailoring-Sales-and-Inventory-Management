@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 $pageTitle = 'My Tasks';
 
@@ -138,13 +139,13 @@ $role = get_user_role();
 </head>
 <body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 // Alert messages
 $alerts = '';
-if (isset($msg)) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:#22c55e;font-size:0.85rem"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($msg) . '</div>';
-if (isset($err)) $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#ef4444;font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($err) . '</div>';
+if (isset($msg)) $alerts .= '<div class="dash-alert dash-alert-success"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($msg) . '</div>';
+if (isset($err)) $alerts .= '<div class="dash-alert dash-alert-danger"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($err) . '</div>';
 
 $subtitle = $status_filter === 'active' ? 'Active tasks assigned to you' : ($status_filter === 'qc' ? 'Pending quality inspection' : 'Completed tasks');
 

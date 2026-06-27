@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once __DIR__ . '/../../../../app/Middleware/auth_check.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $pageTitle = 'AQL Lot Inspection';
 
@@ -42,7 +43,7 @@ $failed_today = $failed_today->fetchColumn();
 </head>
 <body data-role="quality_control_inspector">
 <div class="dash-layout">
-  <?php require_once __DIR__ . '/../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $kpiRow = renderKPIRow([

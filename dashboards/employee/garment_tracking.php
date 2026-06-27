@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once '../../app/Middleware/auth_required.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 $pageTitle = 'Garment Tracking';
 
 $role = get_user_role();
@@ -42,7 +43,7 @@ $history->execute([$order_id]);
 </head>
 <body data-role="<?= htmlspecialchars($role) ?>">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $header = renderPageHeader('Garment Tracking', htmlspecialchars($ord['customer_name']) . ' &middot; ' . htmlspecialchars($ord['product_type'] ?? 'Garment') . ' &middot; ' . htmlspecialchars($ord['stage']), '', [
@@ -79,7 +80,7 @@ if ($history->rowCount() === 0): ?>
 <div style="display:flex;flex-direction:column;gap:12px">
 <?php foreach ($history as $h): ?>
 <div style="display:flex;gap:12px">
-<div style="width:32px;height:32px;border-radius:50%;background:var(--accent-bg);color:var(--accent-color);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-arrows-alt-h" style="font-size:0.75rem"></i></div>
+<div style="width:32px;height:32px;border-radius:50%;background:var(--surface-secondary);color:var(--accent-color);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-arrows-alt-h" style="font-size:0.75rem"></i></div>
 <div style="flex:1;min-width:0">
 <p style="margin:0 0 2px;font-size:0.8125rem;color:var(--text-primary)"><strong>Size <?= htmlspecialchars($h['size']) ?></strong>: <?= htmlspecialchars($h['from_stage'] ?? '—') ?> &rarr; <?= htmlspecialchars($h['to_stage']) ?><?php if ($h['notes']): ?><br><span style="color:var(--text-tertiary);font-size:0.75rem"><?= htmlspecialchars($h['notes']) ?></span><?php endif; ?></p>
 <p style="margin:0;font-size:0.75rem;color:var(--text-tertiary)"><?= htmlspecialchars($h['employee_name'] ?? 'System') ?> &middot; <?= date('M d, g:i A', strtotime($h['created_at'])) ?></p>

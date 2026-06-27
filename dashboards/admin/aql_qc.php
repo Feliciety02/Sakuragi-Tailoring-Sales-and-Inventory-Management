@@ -97,20 +97,17 @@ $pass_rate = $total_lots > 0 ? round($pdo->query("SELECT COUNT(*) FROM qc_lot_in
         .aql-badge.aql-ii { background:#fef3c7;color:#92400e;border-color:#fcd34d }
         .aql-badge.aql-iii { background:#fee2e2;color:#991b1b;border-color:#fca5a5 }
 
-        .aql-grid { display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px }
-        @media (max-width:900px) { .aql-grid { grid-template-columns:1fr } }
+
     </style>
 </head>
 <body data-role="admin">
 <div class="dash-layout">
     <?php render_role_sidebar($pdo); ?>
     <div class="dash-main">
-        <?php include __DIR__ . '/../../app/Views/Shared/topnav.php'; ?>
-
 <?php
 $alerts = '';
-if (isset($success)) $alerts = '<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--color-success);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;font-size:.85rem"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($success) . '</div>';
-elseif (isset($error)) $alerts = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--color-danger);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;font-size:.85rem"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error) . '</div>';
+if (isset($success)) $alerts = '<div class="dash-alert dash-alert-success"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($success) . '</div>';
+elseif (isset($error)) $alerts = '<div class="dash-alert dash-alert-danger"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error) . '</div>';
 
 $kpiRow = renderKPIRow([
     ['value' => (string)$pending_lots, 'label' => 'Pending Lots', 'icon' => 'fas fa-hourglass-half', 'accent' => 'amber'],
@@ -152,8 +149,8 @@ else:
             </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-            <button class="dash-btn dash-btn-outline dash-btn-sm" onclick="openConfigModal(<?= $order['order_id'] ?>,'<?= $aql ?>','<?= $il ?>')"><i class="fas fa-cog"></i></button>
-            <button class="dash-btn dash-btn-accent dash-btn-sm" onclick="openInspectModal(<?= $order['order_id'] ?>,<?= $order['workflow_id'] ?>,<?= $order['total_qty'] ?>,<?= $sampleSize ?>,<?= $acRe[0] ?>,<?= $acRe[1] ?>,'<?= $aql ?>')"><i class="fas fa-search"></i> Inspect</button>
+            <button class="dash-btn dash-btn-outline dash-btn-sm" onclick="openConfigModal(<?= $order['order_id'] ?>,'<?= htmlspecialchars($aql, ENT_QUOTES) ?>','<?= htmlspecialchars($il, ENT_QUOTES) ?>')"><i class="fas fa-cog"></i></button>
+            <button class="dash-btn dash-btn-accent dash-btn-sm" onclick="openInspectModal(<?= $order['order_id'] ?>,<?= $order['workflow_id'] ?>,<?= $order['total_qty'] ?>,<?= $sampleSize ?>,<?= $acRe[0] ?>,<?= $acRe[1] ?>,'<?= htmlspecialchars($aql, ENT_QUOTES) ?>')"><i class="fas fa-search"></i> Inspect</button>
         </div>
     </div>
 </div>
@@ -191,7 +188,7 @@ if (!empty($failReasons)):
 endif;
 $insightsSection = renderPageSection('Sampling Insights', $insightsBody, 'fas fa-chart-bar');
 
-$row2 = '<div class="aql-grid">' . $queueSection . $insightsSection . '</div>';
+$row2 = '<div class="dash-two-col" style="margin-bottom:20px"><div class="dash-main-col">' . $queueSection . '</div><div class="dash-side-col">' . $insightsSection . '</div></div>';
 
 // ── Row 3: Recent Inspections ──
 $recentHtml = '';
@@ -307,3 +304,7 @@ $mainWorkspace = $alerts . $row2 . $recentSection . $scriptsHtml;
 
 echo renderDashboardShell(renderPageHeader($pageTitle, 'Manage AQL sampling inspections for orders in QC.'), $kpiRow, $mainWorkspace);
 ?>
+</div>
+</div>
+</body>
+</html>

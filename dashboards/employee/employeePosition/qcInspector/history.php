@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/db_connect.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once '../../../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $user_id = $_SESSION['user_id'];
 
@@ -44,7 +45,7 @@ $rows = $history->fetchAll();
 </head>
 <body data-role="quality_control_inspector">
 <div class="dash-layout">
-  <?php require_once '../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 if (empty($rows)):
@@ -78,3 +79,8 @@ echo renderDashboardShell(
   '',
   $tableContent . '<script>document.getElementById(\'menuToggle\')?.addEventListener(\'click\', function() { document.getElementById(\'sidebar\')?.classList.toggle(\'collapsed\'); });</script>'
 );
+?>
+</div>
+</div>
+</body>
+</html>

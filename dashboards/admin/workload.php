@@ -142,3 +142,8 @@ echo renderDashboardShell(
   $metricsRow,
   $workspace
 );
+?>
+</div>
+</div>
+</body>
+</html>

@@ -278,13 +278,13 @@ $totalValue = array_sum(array_map(function($i) {
 <?php
 // ── Columns ──
 $columns = [
-  ['field' => 'item_name', 'label' => 'Material', 'sortable' => true],
-  ['field' => 'category',  'label' => 'Category', 'sortable' => true, 'safeHtml' => true],
-  ['field' => 'supplier',  'label' => 'Supplier', 'sortable' => true],
-  ['field' => 'qty',       'label' => 'Stock',    'sortable' => true],
-  ['field' => 'reorder',   'label' => 'Reorder',  'sortable' => true],
+  ['field' => 'item_name', 'label' => 'Material'],
+  ['field' => 'category',  'label' => 'Category'],
+  ['field' => 'supplier',  'label' => 'Supplier'],
+  ['field' => 'qty',       'label' => 'Stock'],
+  ['field' => 'reorder',   'label' => 'Reorder'],
   ['field' => 'status',    'label' => 'Status',   'type' => 'badge'],
-  ['field' => 'updated',   'label' => 'Updated',  'sortable' => true],
+  ['field' => 'updated',   'label' => 'Updated'],
 ];
 if ($isAdmin) {
   $columns[] = ['field' => 'actions', 'label' => 'Actions', 'type' => 'actions'];
@@ -304,40 +304,32 @@ foreach ($inventoryItems as $item):
   } else {
     $status = ['text' => 'In Stock', 'variant' => 'success'];
   }
+  $catColor = stringToColorJS($item['supply_type'] ?? 'Unknown');
+  $catBg = str_replace(['hsl(', ')'], ['hsla(', ', 0.15)'], $catColor);
+  $pct = $reorder > 0 ? min(100, round(($qty / $reorder) * 100)) : ($qty > 0 ? 100 : 0);
+  $barClass = $qty === 0 || ($qty < $reorder && $qty <= $reorder * 0.25) ? 'danger' : ($qty < $reorder ? 'warn' : 'safe');
+  $sku = 'SKU-' . str_pad((string)($item['inventory_id'] ?? 0), 4, '0', STR_PAD_LEFT);
   $row = [
-    'item_name' => htmlspecialchars($item['item_name'] ?? ''),
-    'category' => '<span class="category-badge" style="background:' . stringToColorJS($item['supply_type'] ?? 'Unknown') . '">' . htmlspecialchars($item['supply_type'] ?? 'Unknown') . '</span>',
+    'item_name' => ['html' => '<div class="inv-mat-cell"><div class="inv-mat-icon" style="background:' . $catColor . '"><i class="fas fa-box"></i></div><div class="inv-mat-info"><span class="inv-mat-name">' . htmlspecialchars($item['item_name'] ?? '') . '</span><span class="inv-mat-sku">' . $sku . '</span></div></div>'],
+    'category' => ['html' => '<span class="inv-cat-chip" style="background:' . $catBg . ';color:' . $catColor . '">' . htmlspecialchars($item['supply_type'] ?? 'Unknown') . '</span>'],
     'supplier' => htmlspecialchars($item['supplier_name'] ?? ''),
-    'qty' => $qty,
-    'reorder' => $reorder,
+    'qty' => ['html' => '<div class="inv-stock-cell"><span class="inv-stock-num">' . $qty . '</span><div class="inv-prog-track"><div class="inv-prog-fill ' . $barClass . '" style="width:' . $pct . '%"></div></div></div>', 'sort' => (string)$qty, 'filter' => (string)$qty],
+    'reorder' => ['html' => '<div class="inv-reorder-cell"><span class="inv-reorder-num">' . $reorder . '</span><span class="inv-reorder-label">min</span></div>', 'sort' => (string)$reorder, 'filter' => (string)$reorder],
     'status' => $status,
     'updated' => htmlspecialchars($item['last_updated'] ?? '-'),
   ];
   if ($isAdmin) {
     $row['actions'] = [
-      ['label' => 'View', 'onclick' => "showDetail({$item['inventory_id']})", 'icon' => 'fas fa-eye', 'variant' => 'outline', 'tag' => 'button'],
-      ['label' => 'Edit', 'onclick' => "showEdit({$item['inventory_id']})", 'icon' => 'fas fa-pen', 'variant' => 'outline', 'tag' => 'button'],
-      ['label' => 'Stock In', 'onclick' => "showStockIn({$item['inventory_id']})", 'icon' => 'fas fa-arrow-down', 'variant' => 'outline', 'tag' => 'button'],
-      ['label' => 'Stock Out', 'onclick' => "showStockOut({$item['inventory_id']})", 'icon' => 'fas fa-arrow-up', 'variant' => 'outline', 'tag' => 'button'],
-      ['label' => 'Delete', 'onclick' => "showDelete({$item['inventory_id']})", 'icon' => 'fas fa-trash', 'variant' => 'danger', 'tag' => 'button'],
+      ['label' => 'View', 'title' => 'View', 'onclick' => "showDetail({$item['inventory_id']})", 'icon' => 'fas fa-eye', 'variant' => 'outline', 'tag' => 'button', 'class' => 'inv-action-btn btn-view', 'iconOnly' => true],
+      ['label' => 'Edit', 'title' => 'Edit', 'onclick' => "showEdit({$item['inventory_id']})", 'icon' => 'fas fa-pen', 'variant' => 'outline', 'tag' => 'button', 'class' => 'inv-action-btn btn-edit', 'iconOnly' => true],
+      ['label' => 'Stock In', 'title' => 'Stock In', 'onclick' => "showStockIn({$item['inventory_id']})", 'icon' => 'fas fa-arrow-down', 'variant' => 'outline', 'tag' => 'button', 'class' => 'inv-action-btn btn-in', 'iconOnly' => true],
+      ['label' => 'Stock Out', 'title' => 'Stock Out', 'onclick' => "showStockOut({$item['inventory_id']})", 'icon' => 'fas fa-arrow-up', 'variant' => 'outline', 'tag' => 'button', 'class' => 'inv-action-btn btn-out', 'iconOnly' => true],
+      ['label' => 'Delete', 'title' => 'Delete', 'onclick' => "showDelete({$item['inventory_id']})", 'icon' => 'fas fa-trash', 'variant' => 'danger', 'tag' => 'button', 'class' => 'inv-action-btn btn-del', 'iconOnly' => true],
     ];
   }
   $rows[] = $row;
 endforeach;
 
-// ── Row CSS classes ──
-$rowClasses = [];
-foreach ($inventoryItems as $item) {
-  $qty = (int)($item['quantity'] ?? 0);
-  $reorder = (int)($item['reorder_level'] ?? 0);
-  if ($qty === 0) $rowClasses[] = 'row-out';
-  elseif ($qty < $reorder && $qty <= $reorder * 0.25) $rowClasses[] = 'row-critical';
-  elseif ($qty < $reorder) $rowClasses[] = 'row-low';
-  else $rowClasses[] = '';
-}
-
-$uniqueCategories = json_encode(array_unique(array_map(fn($i) => $i['supply_type'] ?? 'Unknown', $inventoryItems)));
-$uniqueSuppliers = json_encode(array_unique(array_map(fn($i) => $i['supplier_name'] ?? 'Unknown', $inventoryItems)));
 $inventoryJson = json_encode($inventoryItems);
 ?>
 
@@ -358,95 +350,25 @@ if ($urgentCount > 0 || $lowCount > 0) {
     . '<div class="inv-alert-title">Stock Alert</div>'
     . '<div class="inv-alert-desc">' . implode(' and ', $parts) . '. Review and restock soon.</div>'
     . '</div>'
-    . '<button class="dash-btn dash-btn-sm" style="flex-shrink:0;background:' . ($urgentCount > 0 ? '#dc2626' : '#d97706') . ';color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.75rem;font-weight:600" onclick="document.getElementById(\'filterStatus\').value=\'danger\';document.getElementById(\'filterStatus\').dispatchEvent(new Event(\'change\'))">View Critical</button>'
+    . '<button class="dash-btn dash-btn-sm" style="flex-shrink:0;background:' . ($urgentCount > 0 ? '#dc2626' : '#d97706') . ';color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.75rem;font-weight:600" onclick="focusInventoryStatus(\'' . ($urgentCount > 0 ? 'Critical' : 'Low Stock') . '\')">Filter Status</button>'
     . '</div>';
 }
 
-$workspace = '<div class="inv-table-card">'
-  // ── Toolbar ──
-  . '<div class="inv-toolbar">'
-  . '<div class="inv-search-wrap"><i class="fas fa-search"></i><input type="text" id="invSearch" placeholder="Search materials..."></div>'
-  . '<div class="inv-filter-group">'
-  . '<select id="filterCategory"><option value="">Category</option></select>'
-  . '<select id="filterStatus"><option value="">Status</option><option value="success">In Stock</option><option value="warning">Low Stock</option><option value="danger">Out of Stock</option></select>'
-  . '<select id="filterSupplier"><option value="">Supplier</option></select>'
-  . '<button id="resetFilters" class="reset-btn" title="Reset filters"><i class="fas fa-undo"></i></button>'
-  . '</div>'
-  . '<div class="inv-toolbar-actions">'
-  . '<button onclick="exportCSV()" class="dash-btn dash-btn-outline dash-btn-sm"><i class="fas fa-download"></i> Export</button>'
-  . ($isAdmin ? '<button onclick="showAddInventoryModal()" class="dash-btn dash-btn-primary dash-btn-sm"><i class="fas fa-plus"></i> Add Material</button>' : '')
-  . '</div>'
-  . '</div>'
-  // ── Alert Banner ──
-  . $alertBanner
-  // ── Table ──
-  . '<div class="inv-table-wrap">'
-  . '<table class="inv-table" id="invTable">'
-  . '<thead><tr>'
-  . implode('', array_map(fn($c) => '<th data-field="' . $c['field'] . '"' . (!empty($c['sortable']) ? ' class="sortable"' : '') . '>' . htmlspecialchars($c['label']) . (!empty($c['sortable']) ? ' <i class="fas fa-sort sort-icon"></i>' : '') . '</th>', $columns))
-  . '</tr></thead>'
-  . '<tbody id="invBody">'
-  . implode('', array_map(function($r, $i) use ($columns, $inventoryItems, $isAdmin, $rowClasses) {
-    $item = $inventoryItems[$i] ?? [];
-    $qty = (int)($item['quantity'] ?? 0);
-    $reorder = (int)($item['reorder_level'] ?? 0);
-    $isOut = $qty === 0;
-    $isCritical = $qty > 0 && $qty < $reorder && $qty <= $reorder * 0.25;
-    $isLow = $qty > 0 && $qty < $reorder && !$isCritical;
-    $statusText = $isOut ? 'danger' : ($isCritical ? 'danger' : ($isLow ? 'warning' : 'success'));
-    $statusLabel = $isOut ? 'Out of Stock' : ($isCritical ? 'Critical' : ($isLow ? 'Low Stock' : 'In Stock'));
-    $pct = $reorder > 0 ? min(100, round(($qty / $reorder) * 100)) : ($qty > 0 ? 100 : 0);
-    $barClass = $isOut || $isCritical ? 'danger' : ($isLow ? 'warn' : 'safe');
-    $category = htmlspecialchars($item['supply_type'] ?? 'Unknown');
-    $supplier = htmlspecialchars($item['supplier_name'] ?? '');
-    $catColor = stringToColorJS($item['supply_type'] ?? 'Unknown');
-    $catBg = str_replace(['hsl(', ')'], ['hsla(', ', 0.15)'], $catColor);
-    $rowClass = $rowClasses[$i] ?? '';
-    $sku = 'SKU-' . str_pad((string)($item['inventory_id'] ?? 0), 4, '0', STR_PAD_LEFT);
-    $itemName = htmlspecialchars($item['item_name'] ?? '');
-    $itemNameAttr = htmlspecialchars($item['item_name'] ?? '', ENT_QUOTES);
-    $id = $item['inventory_id'] ?? 0;
+$tableActions = [
+  ['label' => 'Add Material', 'icon' => 'fas fa-plus', 'variant' => 'primary', 'tag' => 'button', 'onclick' => 'showAddInventoryModal()'],
+];
+if (!$isAdmin) {
+  $tableActions = [];
+}
 
-    $cells = '';
-    foreach ($columns as $ci) {
-      $f = $ci['field'];
-      if ($f === 'item_name') {
-        $cells .= '<td><div class="inv-mat-cell"><div class="inv-mat-icon" style="background:' . $catColor . '"><i class="fas fa-box"></i></div><div class="inv-mat-info"><span class="inv-mat-name">' . $itemName . '</span><span class="inv-mat-sku">' . $sku . '</span></div></div></td>';
-      } elseif ($f === 'category') {
-        $cells .= '<td><span class="inv-cat-chip" style="background:' . $catBg . ';color:' . $catColor . '">' . $category . '</span></td>';
-      } elseif ($f === 'supplier') {
-        $cells .= '<td>' . $supplier . '</td>';
-      } elseif ($f === 'qty') {
-        $cells .= '<td><div class="inv-stock-cell"><span class="inv-stock-num">' . $qty . '</span><div class="inv-prog-track"><div class="inv-prog-fill ' . $barClass . '" style="width:' . $pct . '%"></div></div></div></td>';
-      } elseif ($f === 'reorder') {
-        $cells .= '<td><div class="inv-reorder-cell"><span class="inv-reorder-num">' . $reorder . '</span><span class="inv-reorder-label">min</span></div></td>';
-      } elseif ($f === 'status') {
-        $cells .= '<td>' . renderStatusBadge($statusLabel, $statusText, 'sm') . '</td>';
-      } elseif ($f === 'updated') {
-        $cells .= '<td style="font-size:0.75rem;color:var(--text-tertiary);white-space:nowrap">' . htmlspecialchars($item['last_updated'] ?? '-') . '</td>';
-      } elseif ($f === 'actions' && $isAdmin) {
-        $cells .= '<td><div class="inv-action-group">'
-          . '<button onclick="showDetail(' . $id . ')" class="inv-action-btn btn-view" title="View details"><i class="fas fa-eye"></i></button>'
-          . '<button onclick="showEdit(' . $id . ')" class="inv-action-btn btn-edit" title="Edit"><i class="fas fa-pen"></i></button>'
-          . '<button onclick="showStockIn(' . $id . ')" class="inv-action-btn btn-in" title="Stock In"><i class="fas fa-arrow-down"></i></button>'
-          . '<button onclick="showStockOut(' . $id . ')" class="inv-action-btn btn-out" title="Stock Out"><i class="fas fa-arrow-up"></i></button>'
-          . '<button onclick="showDelete(' . $id . ')" class="inv-action-btn btn-del" title="Delete"><i class="fas fa-trash"></i></button>'
-          . '</div></td>';
-      }
-    }
-    return '<tr class="inv-row ' . $rowClass . '" data-id="' . $id . '" data-itemname="' . $itemNameAttr . '" data-status="' . $statusText . '" data-category="' . $category . '" data-supplier="' . $supplier . '" data-qty="' . $qty . '" data-reorder="' . $reorder . '">' . $cells . '</tr>';
-  }, $rows, array_keys($rows)))
-  . '</tbody>'
-  . '</table>'
-  . '<div class="inv-empty" id="invEmpty" style="display:none"><span class="empty-state-icon"><i class="fas fa-search"></i></span><strong class="empty-state-title">No materials match your filters</strong><p style="color:var(--text-tertiary);font-size:0.82rem;margin:4px 0 0">Try adjusting your search or filter criteria</p></div>'
-  . '<div class="inv-loading" id="invLoading" style="display:none"><i class="fas fa-spinner fa-spin"></i><p>Loading inventory...</p></div>'
-  . '</div>'
-  // ── Footer ──
-  . '<div class="inv-footer">'
-  . '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="invInfo">' . count($rows) . ' materials</span><select class="rows-select" id="rowsPerPage"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select><span style="font-size:0.72rem">per page</span></div>'
-  . '<div class="pagination" id="invPagination"></div>'
-  . '</div>'
-  . '</div>';
+$workspace = $alertBanner
+  . renderDataTable('invTable', $columns, $rows, [
+      'searchPlaceholder' => 'Search materials...',
+      'emptyMessage' => 'No materials match your filters',
+      'emptyDetail' => 'Try adjusting your search, filter column, or filter value.',
+      'pageSize' => 25,
+      'actions' => $tableActions,
+  ]);
 
 $scriptsHtml = '';
 ob_start(); ?>
@@ -615,114 +537,30 @@ const typeIdMap = <?= json_encode(array_column($types, 'supply_type_id', 'name')
 const supplierIdMap = <?= json_encode(array_column($suppliers, 'supplier_id', 'supplier_name')) ?>;
 const inventoryData = <?= $inventoryJson ?>;
 
-function getUnique(arr, key) { return [...new Set(arr.map(i => i[key] ?? 'Unknown').filter(Boolean))].sort(); }
-
-(function() {
-  var categories = getUnique(inventoryData, 'supply_type');
-  var suppliers = getUnique(inventoryData, 'supplier_name');
-  var catSel = document.getElementById('filterCategory');
-  var supSel = document.getElementById('filterSupplier');
-  categories.forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
-  suppliers.forEach(function(s) { var o = document.createElement('option'); o.value = s; o.textContent = s; supSel.appendChild(o); });
-})();
-
-var state = { page: 1, perPage: 25, sortField: '', sortDir: '', search: '', catFilter: '', statFilter: '', supFilter: '' };
-
-function getFilteredRows() {
-  var rows = Array.from(document.querySelectorAll('#invBody .inv-row'));
-  return rows.filter(function(r) {
-    var text = r.textContent.toLowerCase();
-    if (state.search && text.indexOf(state.search.toLowerCase()) === -1) return false;
-    if (state.catFilter && r.getAttribute('data-category') !== state.catFilter) return false;
-    if (state.statFilter && r.getAttribute('data-status') !== state.statFilter) return false;
-    if (state.supFilter && r.getAttribute('data-supplier') !== state.supFilter) return false;
-    return true;
-  });
-}
-
-function sortRows(rows) {
-  if (!state.sortField) return rows;
-  return rows.sort(function(a, b) {
-    var va = a.querySelector('td:nth-child(' + (getFieldIndex(state.sortField) + 1) + ')')?.textContent.trim() || '';
-    var vb = b.querySelector('td:nth-child(' + (getFieldIndex(state.sortField) + 1) + ')')?.textContent.trim() || '';
-    var na = parseFloat(va), nb = parseFloat(vb);
-    if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb; }
-    if (va < vb) return state.sortDir === 'asc' ? -1 : 1;
-    if (va > vb) return state.sortDir === 'asc' ? 1 : -1;
-    return 0;
-  });
-}
-
-function getFieldIndex(field) {
-  var cols = ['item_name','category','supplier','qty','reorder','status','updated','actions'];
-  return cols.indexOf(field);
-}
-
-function renderTable() {
-  var filtered = getFilteredRows();
-  var sorted = sortRows([...filtered]);
-  var total = sorted.length;
-  var pages = Math.ceil(total / state.perPage) || 1;
-  if (state.page > pages) state.page = pages;
-  var start = (state.page - 1) * state.perPage;
-  var pageRows = sorted.slice(start, start + state.perPage);
-
-  var tbody = document.getElementById('invBody');
-  tbody.innerHTML = '';
-  pageRows.forEach(function(r) { tbody.appendChild(r); });
-
-  var empty = document.getElementById('invEmpty');
-  empty.style.display = total === 0 ? 'block' : 'none';
-
-  var info = document.getElementById('invInfo');
-  if (total === 0) {
-    info.textContent = 'No materials found';
-  } else {
-    info.textContent = 'Showing ' + (start + 1) + '-' + Math.min(total, start + state.perPage) + ' of ' + total + ' materials';
+function focusInventoryStatus(statusLabel) {
+  var wrapper = document.getElementById('invTable')?.closest('.data-table-wrapper');
+  var columnSelect = wrapper?.querySelector('.dt-filter-column');
+  var valueSelect = wrapper?.querySelector('.dt-filter-value');
+  if (!columnSelect || !valueSelect) {
+    return;
   }
-  renderPagination(pages, state.page);
-}
 
-function renderPagination(pages, current) {
-  var el = document.getElementById('invPagination');
-  var html = '<button class="page-btn" onclick="goPage(1)"' + (current <= 1 ? ' disabled' : '') + '><i class="fas fa-chevron-left"></i><i class="fas fa-chevron-left" style="margin-left:-5px"></i></button>';
-  html += '<button class="page-btn" onclick="goPage(' + (current - 1) + ')"' + (current <= 1 ? ' disabled' : '') + '><i class="fas fa-chevron-left"></i></button>';
-  var startP = Math.max(1, current - 2);
-  var endP = Math.min(pages, current + 2);
-  if (startP > 1) html += '<button class="page-btn" onclick="goPage(1)">1</button>' + (startP > 2 ? '<span style="padding:0 4px;color:var(--text-tertiary);font-size:0.7rem">...</span>' : '');
-  for (var i = startP; i <= endP; i++) html += '<button class="page-btn' + (i === current ? ' active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
-  if (endP < pages) html += (endP < pages - 1 ? '<span style="padding:0 4px;color:var(--text-tertiary);font-size:0.7rem">...</span>' : '') + '<button class="page-btn" onclick="goPage(' + pages + ')">' + pages + '</button>';
-  html += '<button class="page-btn" onclick="goPage(' + (current + 1) + ')"' + (current >= pages ? ' disabled' : '') + '><i class="fas fa-chevron-right"></i></button>';
-  html += '<button class="page-btn" onclick="goPage(' + pages + ')"' + (current >= pages ? ' disabled' : '') + '><i class="fas fa-chevron-right"></i><i class="fas fa-chevron-right" style="margin-left:-5px"></i></button>';
-  el.innerHTML = html;
-}
-
-function goPage(p) { state.page = p; renderTable(); }
-
-document.getElementById('invSearch').addEventListener('input', function() { state.search = this.value; state.page = 1; renderTable(); });
-document.getElementById('filterCategory').addEventListener('change', function() { state.catFilter = this.value; state.page = 1; renderTable(); });
-document.getElementById('filterStatus').addEventListener('change', function() { state.statFilter = this.value; state.page = 1; renderTable(); });
-document.getElementById('filterSupplier').addEventListener('change', function() { state.supFilter = this.value; state.page = 1; renderTable(); });
-document.getElementById('rowsPerPage').addEventListener('change', function() { state.perPage = parseInt(this.value); state.page = 1; renderTable(); });
-document.getElementById('resetFilters').addEventListener('click', function() {
-  state.search = ''; state.catFilter = ''; state.statFilter = ''; state.supFilter = '';
-  document.getElementById('invSearch').value = '';
-  document.getElementById('filterCategory').value = '';
-  document.getElementById('filterStatus').value = '';
-  document.getElementById('filterSupplier').value = '';
-  state.page = 1; renderTable();
-});
-
-document.querySelectorAll('#invTable th.sortable').forEach(function(th) {
-  th.addEventListener('click', function() {
-    var field = this.getAttribute('data-field');
-    if (state.sortField === field) { state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; }
-    else { state.sortField = field; state.sortDir = 'asc'; }
-    document.querySelectorAll('#invTable th').forEach(function(h) { h.classList.remove('sort-asc', 'sort-desc'); });
-    this.classList.add('sort-' + state.sortDir);
-    renderTable();
+  var statusHeader = Array.from(document.querySelectorAll('#invTable thead th')).find(function(th) {
+    return (th.textContent || '').toLowerCase().includes('status');
   });
-});
+
+  if (!statusHeader) {
+    return;
+  }
+
+  columnSelect.value = statusHeader.dataset.columnIndex || '';
+  columnSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+  window.setTimeout(function() {
+    valueSelect.value = statusLabel;
+    valueSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  }, 0);
+}
 
 function showDetail(id) {
   var item = inventoryData.find(function(i) { return parseInt(i.inventory_id) === id; });
@@ -761,15 +599,15 @@ function showDetail(id) {
 function closeDetail() { document.getElementById('detailModal').style.display = 'none'; }
 
 function showEdit(id) {
-  var row = document.querySelector('.inv-row[data-id="' + id + '"]');
-  if (!row) return;
+  var item = inventoryData.find(function(i) { return parseInt(i.inventory_id) === id; });
+  if (!item) return;
   document.getElementById('editInventoryId').value = id;
-  document.getElementById('editItemName').value = row.getAttribute('data-itemname') || '';
-  var cat = row.getAttribute('data-category') || '';
+  document.getElementById('editItemName').value = item.item_name || '';
+  var cat = item.supply_type || '';
   document.getElementById('editType').value = typeIdMap[Object.keys(typeIdMap).find(function(k) { return k.toLowerCase() === cat.toLowerCase(); })] || Object.values(typeIdMap)[0];
-  var sup = row.getAttribute('data-supplier') || '';
+  var sup = item.supplier_name || '';
   document.getElementById('editSupplier').value = supplierIdMap[Object.keys(supplierIdMap).find(function(k) { return k.toLowerCase() === sup.toLowerCase(); })] || Object.values(supplierIdMap)[0];
-  document.getElementById('editReorder').value = row.getAttribute('data-reorder') || '10';
+  document.getElementById('editReorder').value = item.reorder_level || '10';
   document.getElementById('stockInOutInventoryId').value = id;
   document.getElementById('stockInOutSupplierId').value = supplierIdMap[Object.keys(supplierIdMap).find(function(k) { return k.toLowerCase() === sup.toLowerCase(); })] || Object.values(supplierIdMap)[0];
   document.getElementById('editInventoryModal').style.display = 'flex';
@@ -805,34 +643,11 @@ function closeAddInventoryModal() { document.getElementById('addInventoryModal')
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function renderBadge(text, variant) { return '<span class="status-badge status-badge-' + variant + ' status-badge-sm">' + esc(text) + '</span>'; }
 
-function exportCSV() {
-  var rows = getFilteredRows();
-  var headers = ['Material','Category','Supplier','Quantity','Reorder Level','Status','Last Updated'];
-  var csv = headers.join(',') + '\n';
-  var statusMap = { 'success': 'In Stock', 'warning': 'Low Stock', 'danger': 'Out of Stock' };
-  rows.forEach(function(r) {
-    var itemName = r.getAttribute('data-itemname') || '';
-    var category = r.getAttribute('data-category') || '';
-    var supplier = r.getAttribute('data-supplier') || '';
-    var qty = r.getAttribute('data-qty') || '0';
-    var reorder = r.getAttribute('data-reorder') || '0';
-    var status = statusMap[r.getAttribute('data-status')] || '';
-    var updated = r.querySelectorAll('td')[6]?.textContent.trim() || '';
-    var vals = [itemName, category, supplier, qty, reorder, status, updated].map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; });
-    csv += vals.join(',') + '\n';
-  });
-  var blob = new Blob([csv], { type: 'text/csv' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'inventory_export.csv'; a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 document.getElementById('menuToggle')?.addEventListener('click', function() { document.getElementById('sidebar')?.classList.toggle('collapsed'); });
 
 document.querySelectorAll('.modal').forEach(function(m) {
   m.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
 });
-
-renderTable();
 </script>
 
 <?php
@@ -862,3 +677,8 @@ echo renderDashboardShell(
   ]),
   $workspace
 );
+?>
+</div>
+</div>
+</body>
+</html>

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/session_handler.php';
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 require_once __DIR__ . '/../../app/Middleware/role_admin_only.php';
 
 $pageTitle = 'Order Materials';
@@ -75,7 +76,6 @@ $inv_items = $pdo->query("SELECT i.*, st.name AS supply_type_name, s.supplier_na
 <div class="dash-layout">
     <?php render_role_sidebar($pdo); ?>
     <div class="dash-main">
-        <?php include __DIR__ . '/../../app/Views/Shared/topnav.php'; ?>
 
 <?php
 $alerts = '';
@@ -89,9 +89,9 @@ $orderCols = [
     ['label' => 'Qty', 'field' => 'qty'],
     ['label' => 'Materials', 'field' => 'materials'],
     ['label' => 'Allocated', 'field' => 'allocated'],
-    ['label' => 'Consumed', 'field' => 'consumed'],
+    ['label' => 'Consumed', 'field' => 'consumed', 'safeHtml' => true],
     ['label' => 'Status', 'field' => 'status', 'type' => 'badge'],
-    ['label' => 'Actions', 'type' => 'actions'],
+    ['label' => 'Actions', 'field' => 'actions', 'type' => 'actions'],
 ];
 $orderData = [];
 foreach ($orders as $order):
@@ -131,17 +131,18 @@ ob_start(); ?>
   </div>
 </div>
 <script>
-function filterOrders() {
-    const q = document.getElementById('orderSearch')?.value.toLowerCase();
-    document.querySelectorAll('#orderTable tbody tr').forEach(function(row) { if (row.style) row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none'; });
-}
 function showOrderDetails(orderId) {
     document.getElementById('modalTitle').textContent = 'Order #' + orderId + ' - Materials';
     document.getElementById('modalBody').innerHTML = '<i class="fas fa-spinner fa-spin fa-2x" style="color:var(--text-tertiary)"></i>';
     document.getElementById('orderMaterialsModal').style.display = 'flex';
     fetch('/dashboards/admin/order_materials_ajax.php?order_id=' + orderId)
         .then(function(r) { return r.text(); })
-        .then(function(html) { document.getElementById('modalBody').innerHTML = html; })
+        .then(function(html) {
+            document.getElementById('modalBody').innerHTML = html;
+            if (window.SakuragiDataTable) {
+                SakuragiDataTable.initAll();
+            }
+        })
         .catch(function() { document.getElementById('modalBody').innerHTML = '<div class="dash-alert dash-alert-danger">Failed to load order details.</div>'; });
 }
 function closeOrderModal() { document.getElementById('orderMaterialsModal').style.display = 'none'; }
@@ -153,3 +154,7 @@ $workspace = $alerts . renderPanelCard('All Orders', $tableHtml, 'fas fa-roll') 
 
 echo renderDashboardShell(renderPageHeader($pageTitle, 'Manage material allocation and consumption across orders.'), '', $workspace);
 ?>
+</div>
+</div>
+</body>
+</html>

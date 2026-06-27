@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/public/assets/css/tables.css" />
   
   <script src="/public/assets/js/sidebar.js" defer></script>
+  <script src="/public/assets/js/data-table.js" defer></script>
   <script src="/public/assets/js/tables.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 

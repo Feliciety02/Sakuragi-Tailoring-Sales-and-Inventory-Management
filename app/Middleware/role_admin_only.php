@@ -1,9 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../../config/session_handler.php';
-require_once __DIR__ . '/../../config/constants.php';
-require_once __DIR__ . '/../../config/db_connect.php';
-require_once __DIR__ . '/../Support/helpers.php';
+require_once __DIR__ . '/../bootstrap.php';
 // Check if user is logged in first
 if (!is_logged_in()) {
     header('Location: /auth/login.php');

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
 require_once '../../app/Controllers/OrderController.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -36,7 +37,7 @@ $pageTitle = 'My Orders';
 </head>
 <body data-role="customer">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 // ── Build order cards ──

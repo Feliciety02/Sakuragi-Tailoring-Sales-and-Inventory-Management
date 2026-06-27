@@ -64,6 +64,12 @@
   --role-accent-soft: rgba(214, 40, 40, 0.08);
   --role-accent-active: rgba(214, 40, 40, 0.12);
   --role-accent-glow: rgba(214, 40, 40, 0.25);
+
+  /* ── Aliases (backward compat) ── */
+  --bg-primary: var(--surface);
+  --bg-secondary: var(--surface-secondary);
+  --border-color: var(--border);
+  --accent-color: var(--role-accent);
 }
 
 /* ── Role-based accent overrides ── */
@@ -156,31 +162,8 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   KPI CARDS (trend variant)
+   KPI CARDS — see dashboard-modern.css for core styles
    ═══════════════════════════════════════════════════════════════ */
-
-.kpi-trend {
-  font-size: 0.72rem;
-  font-weight: 600;
-  margin-top: 6px;
-  color: var(--text-tertiary);
-}
-.kpi-trend-arrow {
-  color: var(--color-success);
-}
-.kpi-trend-arrow.is-down {
-  color: var(--color-danger);
-}
-/* KPI accent border */
-.kpi-card.kpi-accent-red { border-top: 3px solid #DC2626; }
-.kpi-card.kpi-accent-blue { border-top: 3px solid var(--role-accent); }
-.kpi-card.kpi-accent-green { border-top: 3px solid var(--color-success); }
-.kpi-card.kpi-accent-amber { border-top: 3px solid var(--color-warning); }
-.kpi-card.kpi-accent-purple { border-top: 3px solid #8b5cf6; }
-
-/* KPI icon bg variants (keep existing, add missing) */
-.kpi-icon-bg-purple { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
-.kpi-icon-bg-cyan { background: rgba(8, 145, 178, 0.12); color: #0891b2; }
 
 /* ═══════════════════════════════════════════════════════════════
    STATUS BADGES (unified)
@@ -264,6 +247,7 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   overflow: hidden;
+  position: relative;
 }
 .data-table-toolbar {
   display: flex;
@@ -274,12 +258,68 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
+.data-table-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.data-table-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .data-table-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.dash-btn-icon-only {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  justify-content: center;
+  gap: 0;
+}
+.dash-btn-icon-only i {
+  margin: 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .data-table-scroll {
   overflow-x: auto;
+}
+.data-table-loading {
+  position: absolute;
+  inset: 73px 0 auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.96);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  z-index: 2;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.data-table-loading.is-ready {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 .data-table {
   width: 100%;
@@ -301,11 +341,18 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
   cursor: default;
   user-select: none;
 }
+.data-table-th.is-sortable {
+  cursor: pointer;
+}
 .data-table-th .sort-icon {
   margin-left: 4px;
   opacity: 0.3;
   font-size: 0.65rem;
   vertical-align: middle;
+}
+.data-table-th .sort-icon.sort-active {
+  opacity: 1;
+  color: var(--role-accent);
 }
 .data-table-row {
   transition: background 0.15s ease;
@@ -325,6 +372,10 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
 .data-table-empty {
   padding: 0;
 }
+.data-table-empty-state {
+  padding: 24px 20px 28px;
+  border-top: 1px solid var(--border-light);
+}
 .data-table-footer {
   display: flex;
   justify-content: space-between;
@@ -334,21 +385,78 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
   font-size: 0.8rem;
   color: var(--text-tertiary);
 }
-.data-table-pagination {
+.data-table-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.dt-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dt-page-size span {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+.dt-pagination {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-.data-table-pagination a {
+.dt-page-btn {
   padding: 4px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-secondary);
   font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
-.data-table-pagination a:hover {
+.dt-page-btn:hover:not(:disabled) {
   border-color: var(--role-accent);
   color: var(--role-accent);
+}
+.dt-page-btn.active {
+  border-color: var(--role-accent);
+  background: var(--role-accent-soft);
+  color: var(--role-accent);
+  font-weight: 700;
+}
+.dt-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dt-page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 4px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+.dt-page-info {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.table-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--role-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.table-link:hover {
+  text-decoration: underline;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -753,6 +861,40 @@ body[data-role] .border-role-accent { border-color: var(--role-accent); }
 .dash-btn-danger:hover {
   background: #b91c1c;
   transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ALERT (unified success/error notifications)
+   ═══════════════════════════════════════════════════════════════ */
+
+.dash-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+.dash-alert-success {
+  background: rgba(5, 150, 105, 0.08);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+  color: var(--color-success);
+}
+.dash-alert-danger {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  color: var(--color-danger);
+}
+.dash-alert-warning {
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  color: var(--color-warning);
+}
+.dash-alert-info {
+  background: rgba(8, 145, 178, 0.08);
+  border: 1px solid rgba(8, 145, 178, 0.2);
+  color: var(--color-info);
 }
 
 /* ═══════════════════════════════════════════════════════════════

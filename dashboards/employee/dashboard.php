@@ -120,7 +120,7 @@ $pageTitle = $positionName . ' Dashboard';
 </head>
 <body data-role="<?= $roleAttr ?>">
   <div class="dash-layout">
-    <?php require_once __DIR__ . '/../../app/Views/Shared/Sidebars/employee.php'; ?>
+    <?php require_once __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'Shared' . DIRECTORY_SEPARATOR . 'Sidebars' . DIRECTORY_SEPARATOR . 'employee.php'; ?>
     <div class="dash-main">
 <?php
 // ── Build active task card ──

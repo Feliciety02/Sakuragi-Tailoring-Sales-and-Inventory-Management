@@ -255,14 +255,14 @@ function get_nav_items_for_role(PDO $pdo, ?string $role = null, ?int $userId = n
                 ['href' => $dashAdmin('aql_qc.php'), 'icon' => 'fas fa-chart-pie', 'label' => 'AQL Sampling QC'],
             ]],
             ['type' => 'group', 'id' => 'admin-analytics', 'icon' => 'fas fa-chart-bar', 'label' => 'Reports', 'children' => [
-                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports &amp; Analytics'],
+                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports & Analytics'],
                 ['href' => $dashAdmin('production_analytics.php'), 'icon' => 'fas fa-chart-line', 'label' => 'Analytics'],
             ]],
-            ['type' => 'group', 'id' => 'admin-resources', 'icon' => 'fas fa-box', 'label' => 'Inventory &amp; Materials', 'children' => [
+            ['type' => 'group', 'id' => 'admin-resources', 'icon' => 'fas fa-box', 'label' => 'Inventory & Materials', 'children' => [
                 ['href' => $dashAdmin('inventory.php'), 'icon' => 'fas fa-box', 'label' => 'Inventory'],
                 ['href' => $dashAdmin('order_materials.php'), 'icon' => 'fas fa-roll', 'label' => 'Order Materials'],
             ]],
-            ['type' => 'group', 'id' => 'admin-team', 'icon' => 'fas fa-users', 'label' => 'Team &amp; Settings', 'children' => [
+            ['type' => 'group', 'id' => 'admin-team', 'icon' => 'fas fa-users', 'label' => 'Team & Settings', 'children' => [
                 ['href' => $dashAdmin('employees.php'), 'icon' => 'fas fa-users', 'label' => 'Employees'],
                 ['href' => $dashAdmin('settings.php'), 'icon' => 'fas fa-cog', 'label' => 'Settings'],
             ]],
@@ -304,7 +304,7 @@ function get_nav_items_for_role(PDO $pdo, ?string $role = null, ?int $userId = n
             ['type' => 'group', 'id' => 'ops-workforce', 'icon' => 'fas fa-users', 'label' => 'Workforce', 'children' => [
                 ['href' => $dashAdmin('workload.php'), 'icon' => 'fas fa-tasks', 'label' => 'Workload'],
                 ['href' => $dashAdmin('production_analytics.php'), 'icon' => 'fas fa-chart-line', 'label' => 'Team Performance'],
-                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports &amp; Analytics'],
+                ['href' => $dashAdmin('reports.php'), 'icon' => 'fas fa-chart-bar', 'label' => 'Reports & Analytics'],
             ]],
             ['type' => 'link', 'href' => $dashEmp('profile.php'), 'icon' => 'fas fa-user', 'label' => 'Profile'],
         ],

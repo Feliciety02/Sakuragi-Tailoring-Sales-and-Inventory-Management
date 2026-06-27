@@ -75,7 +75,7 @@ $reworkOrders = $pdo->query("
     LEFT JOIN users u ON o.user_id = u.user_id
     WHERE o.status NOT IN ('Completed','Cancelled')
     ORDER BY rl.created_at DESC LIMIT 10
-");
+")->fetchAll();
 
 // Defect analytics
 $defectTypes = $pdo->query("
@@ -120,8 +120,7 @@ $pageTitle = 'Quality Control';
     .defect-stat .defect-name { font-size:.82rem;color:var(--text-primary);font-weight:500 }
     .defect-stat .defect-count { font-size:.82rem;color:var(--text-tertiary) }
 
-    .qc-dashboard-grid { display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px }
-    @media (max-width:900px) { .qc-dashboard-grid { grid-template-columns:1fr } }
+
   </style>
 </head>
 <body data-role="admin">
@@ -132,7 +131,7 @@ $pageTitle = 'Quality Control';
 $alerts = '';
 if ($message):
   $isErr = strpos($message, 'Error') !== false;
-  $alerts = '<div style="background:' . ($isErr ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)') . ';border:1px solid ' . ($isErr ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)') . ';color:' . ($isErr ? '#ef4444' : '#22c55e') . ';border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;font-size:.85rem"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($message) . '</div>';
+  $alerts = '<div class="dash-alert ' . ($isErr ? 'dash-alert-danger' : 'dash-alert-success') . '"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($message) . '</div>';
 endif;
 
 $metricsRow = renderKPIRow([
@@ -200,7 +199,7 @@ endif;
 $analyticsSection = renderPageSection('Quality Analytics', $analyticsBody, 'fas fa-chart-bar');
 
 // ── Row 2: Queue + Analytics side by side ──
-$row2 = '<div class="qc-dashboard-grid">' . $queueSection . $analyticsSection . '</div>';
+$row2 = '<div class="dash-two-col" style="margin-bottom:20px"><div class="dash-main-col">' . $queueSection . '</div><div class="dash-side-col">' . $analyticsSection . '</div></div>';
 
 // ── Recent Inspections Timeline ──
 $historyHtml = '';
@@ -254,7 +253,7 @@ endif;
 $reworkSection = renderPageSection('Rework Monitoring', $reworkHtml, 'fas fa-undo-alt');
 
 // ── Row 3: Timeline + Rework side by side ──
-$row3 = '<div class="qc-dashboard-grid">' . $timelineSection . $reworkSection . '</div>';
+$row3 = '<div class="dash-two-col" style="margin-bottom:20px"><div class="dash-main-col">' . $timelineSection . '</div><div class="dash-side-col">' . $reworkSection . '</div></div>';
 
 $scriptsHtml = '';
 ob_start(); ?>

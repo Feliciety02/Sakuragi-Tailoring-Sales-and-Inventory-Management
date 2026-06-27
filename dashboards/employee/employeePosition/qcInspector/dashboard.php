@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/db_connect.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once '../../../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'QC Inspector';
@@ -64,7 +65,7 @@ $pendingQCList = $pendingQC->fetchAll();
 </head>
 <body data-role="quality_control_inspector">
 <div class="dash-layout">
-  <?php require_once '../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 // ── Build awaiting inspection cards ──

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/session_handler.php';
 require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once __DIR__ . '/../../../../app/Middleware/auth_check.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $pageTitle = 'AQL Lot Inspection';
 
@@ -68,9 +69,8 @@ $minorAcRe = getAQLAcceptReject('4.0', $lot['sample_size']);
 </head>
 <body data-role="quality_control_inspector">
 <div class="dash-layout">
-    <?php include __DIR__ . '/../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+    <?php render_role_sidebar($pdo); ?>
     <div class="dash-main">
-        <?php include __DIR__ . '/../../../../app/Views/Shared/topnav.php'; ?>
 
 <?php
 $breadcrumb = '<a href="aql_dashboard.php" style="font-size:0.8rem;color:var(--text-tertiary);text-decoration:none"><i class="fas fa-arrow-left"></i> Back to AQL Dashboard</a>';
@@ -81,10 +81,10 @@ if (isset($success)) $alerts = '<div class="dash-alert dash-alert-success" style
 elseif (isset($error)) $alerts = '<div class="dash-alert dash-alert-danger" style="margin:0 24px 16px"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error) . '</div>';
 
 $kpiRow = renderKPIRow([
-    ['value' => $lot['lot_size'], 'label' => 'Lot Size', 'icon' => 'fas fa-box'],
-    ['value' => $lot['sample_size'], 'label' => 'Sample Size', 'icon' => 'fas fa-search'],
-    ['value' => $lot['aql_level'], 'label' => 'AQL Level', 'icon' => 'fas fa-tag'],
-    ['value' => $acRe[0] . '/' . $acRe[1], 'label' => 'Accept / Reject', 'icon' => 'fas fa-check-circle'],
+    ['value' => $lot['lot_size'], 'label' => 'Lot Size', 'icon' => 'fas fa-box', 'accent' => 'blue'],
+    ['value' => $lot['sample_size'], 'label' => 'Sample Size', 'icon' => 'fas fa-search', 'accent' => 'cyan'],
+    ['value' => $lot['aql_level'], 'label' => 'AQL Level', 'icon' => 'fas fa-tag', 'accent' => 'purple'],
+    ['value' => $acRe[0] . '/' . $acRe[1], 'label' => 'Accept / Reject', 'icon' => 'fas fa-check-circle', 'accent' => 'green'],
 ]);
 
 ob_start();
@@ -158,3 +158,7 @@ updateVerdict();
 
 echo renderDashboardShell($header, $kpiRow, $workspace);
 ?>
+</div>
+</div>
+</body>
+</html>

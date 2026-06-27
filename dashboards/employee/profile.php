@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once '../../app/Middleware/auth_required.php';
 require_once '../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 $pageTitle = 'My Profile';
 
 if (get_user_role() === ROLE_CUSTOMER) {
@@ -481,7 +482,7 @@ if (count($nameParts) >= 2) {
 </head>
 <body data-role="<?= htmlspecialchars(get_user_role()) ?>">
 <div class="dash-layout">
-  <?php require_once __DIR__ . '/../../app/Views/Shared/Sidebars/employee.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <div class="dash-content">
       <?= renderPageHeader('Profile', 'Manage your account and view your performance') ?>

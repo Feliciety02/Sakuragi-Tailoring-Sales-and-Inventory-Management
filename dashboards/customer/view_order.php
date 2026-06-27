@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -110,7 +111,7 @@ $stageColor = $STAGE_CONFIG[$order['stage']]['color'] ?? 'var(--role-accent)';
 </head>
 <body data-role="customer">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 $breadcrumb = '<div style="font-size:0.78rem;color:var(--text-tertiary);margin-bottom:8px"><a href="my_orders.php" style="color:var(--role-accent);text-decoration:none">My Orders</a> <span style="margin:0 4px">/</span> <span style="color:var(--text-primary)">#ORD-' . $order_id . '</span></div>';

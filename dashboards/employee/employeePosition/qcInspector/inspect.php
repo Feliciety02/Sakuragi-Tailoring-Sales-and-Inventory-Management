@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../../../config/constants.php';
 require_once __DIR__ . '/../../../../config/db_connect.php';
 require_once __DIR__ . '/../../../../config/component_helpers.php';
 require_once '../../../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../../../app/Support/helpers.php';
 
 $user_id = $_SESSION['user_id'];
 
@@ -158,7 +159,7 @@ $order_not_found = !$ord;
 </head>
 <body data-role="quality_control_inspector">
 <div class="dash-layout">
-  <?php require_once '../../../../app/Views/Shared/Sidebars/qc_inspector.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 if ($order_not_found):
@@ -174,10 +175,10 @@ else:
   $alerts = '';
   if ($message):
     $isErr = strpos($message, 'Error') !== false;
-    $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;font-size:0.85rem;background:' . ($isErr ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)') . ';border:1px solid ' . ($isErr ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)') . ';color:' . ($isErr ? '#ef4444' : '#22c55e') . '"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($message) . '</div>';
+    $alerts .= '<div class="dash-alert ' . ($isErr ? 'dash-alert-danger' : 'dash-alert-success') . '"><i class="fas ' . ($isErr ? 'fa-exclamation-circle' : 'fa-check-circle') . '"></i> ' . htmlspecialchars($message) . '</div>';
   endif;
   if ($ord['qc_result'] && $ord['qc_result'] !== 'Pending'):
-    $alerts .= '<div class="panel-card" style="padding:10px 14px;margin-bottom:12px;font-size:0.85rem;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);color:#92400e"><i class="fas fa-exclamation-triangle"></i> This order was already inspected — result: <strong>' . htmlspecialchars($ord['qc_result']) . '</strong>. Submitting again will overwrite.</div>';
+    $alerts .= '<div class="dash-alert dash-alert-warning"><i class="fas fa-exclamation-triangle"></i> This order was already inspected — result: <strong>' . htmlspecialchars($ord['qc_result']) . '</strong>. Submitting again will overwrite.</div>';
   endif;
 
   $headerCard = '<div class="order-header"><div class="order-header-top"><div><h2 class="order-header-title">#ORD-' . $ord['order_id'] . ' — ' . htmlspecialchars($ord['product_type'] ?? 'Garment') . '</h2>' . renderStatusBadge(htmlspecialchars($ord['stage']), 'info', 'sm') . '</div></div><div class="order-header-meta"><span><i class="fas fa-user"></i> ' . htmlspecialchars($ord['customer_name']) . '</span><span><i class="fas fa-user-tag"></i> ' . htmlspecialchars($ord['employee_name'] ?? 'Unassigned') . '</span><span><i class="fas fa-layer-group"></i> ' . htmlspecialchars($ord['stage']) . '</span></div></div>';
@@ -284,3 +285,7 @@ document.getElementById(\'menuToggle\')?.addEventListener(\'click\', function() 
 </script>');
 endif;
 ?>
+</div>
+</div>
+</body>
+</html>

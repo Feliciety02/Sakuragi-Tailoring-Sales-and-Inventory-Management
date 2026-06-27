@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../../config/component_helpers.php';
 require_once '../../app/Middleware/auth_required.php';
+require_once __DIR__ . '/../../app/Support/helpers.php';
 
 if (get_user_role() !== ROLE_CUSTOMER) {
     header('Location: /dashboards/employee/dashboard.php');
@@ -186,7 +187,7 @@ if (count($parts) >= 2) {
 </head>
 <body data-role="customer">
 <div class="dash-layout">
-  <?php require_once '../../app/Views/Shared/Sidebars/customer.php'; ?>
+  <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
 // ── Build profile sidebar card ──
@@ -237,20 +238,20 @@ $metricsRow .= '</div>';
 $recentHtml = '';
 if (!empty($recentOrders)) {
   $cols = [
-    ['field' => 'order_link', 'label' => 'Order #', 'safeHtml' => true],
+    ['field' => 'order_link', 'label' => 'Order #', 'type' => 'link'],
     ['field' => 'date', 'label' => 'Date'],
     ['field' => 'service', 'label' => 'Service'],
-    ['field' => 'status', 'label' => 'Status', 'safeHtml' => true],
+    ['field' => 'status', 'label' => 'Status', 'type' => 'badge'],
     ['field' => 'total', 'label' => 'Total'],
   ];
   $dataRows = [];
   foreach ($recentOrders as $ord) {
     $statusVariant = $ord['status'] === 'Completed' ? 'success' : ($ord['status'] === 'Cancelled' ? 'danger' : ($ord['status'] === 'In Progress' ? 'accent' : 'warning'));
     $dataRows[] = [
-      'order_link' => '<a href="view_order.php?id=' . $ord['order_id'] . '" style="color:var(--role-accent);text-decoration:none;font-weight:600">#ORD-' . $ord['order_id'] . '</a>',
+      'order_link' => ['href' => 'view_order.php?id=' . $ord['order_id'], 'label' => '#ORD-' . $ord['order_id']],
       'date' => date('M d, Y', strtotime($ord['order_date'])),
       'service' => htmlspecialchars($ord['service_name']),
-      'status' => renderStatusBadge(htmlspecialchars($ord['status']), $statusVariant, 'sm'),
+      'status' => ['text' => $ord['status'], 'variant' => $statusVariant],
       'total' => '₱' . number_format($ord['total_price'], 2),
     ];
   }
@@ -265,8 +266,8 @@ $settingsHtml = '<div style="display:flex;flex-wrap:wrap;gap:20px">';
 // Profile form
 $profileForm = '<div class="panel-card" style="flex:1;min-width:280px;padding:20px">';
 $profileForm .= '<h5 style="margin:0 0 16px;font-size:0.95rem;font-weight:700;color:var(--text-primary)"><i class="fas fa-user" style="color:var(--role-accent);margin-right:6px"></i> Personal Details</h5>';
-if ($profileMessage) $profileForm .= '<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--color-success);border-radius:var(--radius-sm);padding:10px 14px;font-size:.82rem;margin-bottom:12px">' . htmlspecialchars($profileMessage) . '</div>';
-if ($profileError) $profileForm .= '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--color-danger);border-radius:var(--radius-sm);padding:10px 14px;font-size:.82rem;margin-bottom:12px">' . htmlspecialchars($profileError) . '</div>';
+if ($profileMessage) $profileForm .= '<div class="dash-alert dash-alert-success" style="margin-bottom:12px">' . htmlspecialchars($profileMessage) . '</div>';
+if ($profileError) $profileForm .= '<div class="dash-alert dash-alert-danger" style="margin-bottom:12px">' . htmlspecialchars($profileError) . '</div>';
 $profileForm .= '<form method="post">';
 $profileForm .= '<div class="form-group"><label>Full Name</label><input type="text" value="' . htmlspecialchars($fullName) . '" disabled></div>';
 $profileForm .= '<div class="form-group"><label for="email">Email</label><input type="email" id="email" name="email" value="' . htmlspecialchars($user['email'] ?? '') . '" required></div>';
@@ -277,8 +278,8 @@ $profileForm .= '</form></div>';
 // Password form
 $pwForm = '<div class="panel-card" style="flex:1;min-width:280px;padding:20px">';
 $pwForm .= '<h5 style="margin:0 0 16px;font-size:0.95rem;font-weight:700;color:var(--text-primary)"><i class="fas fa-lock" style="color:var(--role-accent);margin-right:6px"></i> Change Password</h5>';
-if ($passwordMessage) $pwForm .= '<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--color-success);border-radius:var(--radius-sm);padding:10px 14px;font-size:.82rem;margin-bottom:12px">' . htmlspecialchars($passwordMessage) . '</div>';
-if ($passwordError) $pwForm .= '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--color-danger);border-radius:var(--radius-sm);padding:10px 14px;font-size:.82rem;margin-bottom:12px">' . htmlspecialchars($passwordError) . '</div>';
+if ($passwordMessage) $pwForm .= '<div class="dash-alert dash-alert-success" style="margin-bottom:12px">' . htmlspecialchars($passwordMessage) . '</div>';
+if ($passwordError) $pwForm .= '<div class="dash-alert dash-alert-danger" style="margin-bottom:12px">' . htmlspecialchars($passwordError) . '</div>';
 $pwForm .= '<form method="post">';
 $pwForm .= '<div class="form-group"><label for="current_password">Current Password</label><input type="password" id="current_password" name="current_password" required></div>';
 $pwForm .= '<div class="form-group"><label for="new_password">New Password</label><input type="password" id="new_password" name="new_password" required minlength="8"></div>';

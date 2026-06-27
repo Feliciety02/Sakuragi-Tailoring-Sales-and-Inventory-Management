@@ -72,8 +72,6 @@ $minorAcRe = getAQLAcceptReject('4.0', $lot['sample_size']);
 <div class="dash-layout">
     <?php render_role_sidebar($pdo); ?>
     <div class="dash-main">
-        <?php include __DIR__ . '/../../app/Views/Shared/topnav.php'; ?>
-
 <?php
 $alerts = '';
 if (isset($success)) $alerts = '<div class="dash-alert dash-alert-success" style="margin:0 24px 16px"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($success) . '</div>';
@@ -82,10 +80,10 @@ elseif (isset($error)) $alerts = '<div class="dash-alert dash-alert-danger" styl
 $header = renderPageHeader('AQL Lot Inspection #' . $lot_inspection_id, 'Order #' . $lot['order_id'] . ' &middot; ' . htmlspecialchars($lot['customer_name']), '', [['label' => 'Back to AQL QC', 'href' => 'aql_qc.php', 'icon' => 'fas fa-arrow-left', 'variant' => 'outline']]);
 
 $kpiRow = renderKPIRow([
-    ['value' => $lot['lot_size'], 'label' => 'Lot Size', 'sub' => 'pieces', 'icon' => 'fas fa-box'],
-    ['value' => $lot['sample_size'], 'label' => 'Sample Size', 'sub' => 'pieces to inspect', 'icon' => 'fas fa-search'],
-    ['value' => $lot['aql_level'], 'label' => 'AQL Level', 'sub' => 'Acceptable Quality Level', 'icon' => 'fas fa-tag'],
-    ['value' => $acRe[0] . ' / ' . $acRe[1], 'label' => 'Accept / Reject', 'sub' => 'Major defects threshold', 'icon' => 'fas fa-check-circle'],
+    ['value' => $lot['lot_size'], 'label' => 'Lot Size', 'sub' => 'pieces', 'icon' => 'fas fa-box', 'accent' => 'blue'],
+    ['value' => $lot['sample_size'], 'label' => 'Sample Size', 'sub' => 'pieces to inspect', 'icon' => 'fas fa-search', 'accent' => 'cyan'],
+    ['value' => $lot['aql_level'], 'label' => 'AQL Level', 'sub' => 'Acceptable Quality Level', 'icon' => 'fas fa-tag', 'accent' => 'purple'],
+    ['value' => $acRe[0] . ' / ' . $acRe[1], 'label' => 'Accept / Reject', 'sub' => 'Major defects threshold', 'icon' => 'fas fa-check-circle', 'accent' => 'green'],
 ]);
 
 ob_start();
@@ -173,3 +171,7 @@ updateVerdict();
 
 echo renderDashboardShell($header, $kpiRow, $workspace);
 ?>
+</div>
+</div>
+</body>
+</html>

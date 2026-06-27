@@ -16,10 +16,6 @@ $stats['in_qc'] = (int)$pdo->query("SELECT COUNT(*) FROM order_workflow WHERE st
 $avgLead = $pdo->query("SELECT AVG(TIMESTAMPDIFF(DAY, order_date, COALESCE(completion_date, NOW()))) FROM orders WHERE status = 'Completed'")->fetchColumn();
 $stats['avg_lead'] = $avgLead ? round((float)$avgLead) : '-';
 
-// ── Employee load ──
-$empLoad = $pdo->query("SELECT u.user_id, u.full_name, COUNT(*) as cnt FROM order_workflow ow JOIN users u ON ow.assigned_employee = u.user_id JOIN orders o ON ow.order_id = o.order_id WHERE o.status NOT IN ('Completed','Cancelled','Refunded') GROUP BY ow.assigned_employee ORDER BY cnt DESC")->fetchAll();
-$maxEmpLoad = $empLoad ? max(array_column($empLoad, 'cnt')) : 1;
-
 // ── Orders ──
 $orders = $pdo->query("SELECT o.order_id, o.order_date, o.completion_date, o.status, ow.stage, ow.started_at, ow.expected_completion, ow.priority, u.full_name AS customer_name, e.full_name AS employee_name, s.service_name, (SELECT SUM(quantity) FROM order_details WHERE order_id = o.order_id) AS total_qty, (SELECT COUNT(*) FROM order_details WHERE order_id = o.order_id) AS total_items FROM orders o JOIN users u ON o.user_id = u.user_id LEFT JOIN services s ON o.service_id = s.service_id LEFT JOIN order_workflow ow ON o.order_id = ow.order_id LEFT JOIN users e ON ow.assigned_employee = e.user_id WHERE o.status NOT IN ('Cancelled', 'Refunded') ORDER BY ow.started_at IS NULL, ow.started_at ASC, o.order_date ASC")->fetchAll();
 
@@ -65,11 +61,6 @@ $stage_order = [
   <link rel="stylesheet" href="/public/assets/css/dashboard-modern.css" />
   <link rel="stylesheet" href="/public/assets/css/components.css" />
   <style id="production-schedule-styles">
-    /* ── Layout ── */
-    .ops-layout { display:flex;gap:24px;padding:0 24px 32px;align-items:flex-start }
-    .ops-main { flex:1;min-width:0 }
-    .ops-sidebar { width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:16px }
-
     /* ── Timeline ── */
     .timeline-container { background:var(--bg-primary);border-radius:12px;border:1px solid var(--border-color);overflow:hidden }
     .timeline-scroll { overflow-x:auto;overflow-y:visible;position:relative }
@@ -107,10 +98,6 @@ $stage_order = [
     .order-card .order-id { font-size:0.82rem;font-weight:700;color:var(--text-primary);text-decoration:none }
     .order-card .order-id:hover { color:var(--role-accent) }
     .order-card .priority-badge { font-size:0.55rem;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:3px;letter-spacing:.04em }
-    .priority-badge.urgent { background:rgba(239,68,68,0.12);color:#dc2626 }
-    .priority-badge.high { background:rgba(249,115,22,0.12);color:#ea580c }
-    .priority-badge.medium { background:rgba(234,179,8,0.12);color:#ca8a04 }
-    .priority-badge.low { background:rgba(107,114,128,0.12);color:#6b7280 }
     .order-card .meta { font-size:0.72rem;color:var(--text-tertiary);display:flex;gap:12px;flex-wrap:wrap;align-items:center }
     .order-card .meta i { width:14px;text-align:center;font-size:0.65rem;color:var(--text-tertiary) }
     .order-card .assignee { display:inline-flex;align-items:center;gap:4px }
@@ -126,15 +113,6 @@ $stage_order = [
     .today-line { position:absolute;top:0;bottom:0;width:2px;background:var(--accent-color);z-index:2;pointer-events:none;opacity:.6 }
     .today-line::before { content:'Today';position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:0.55rem;font-weight:700;color:var(--accent-color);white-space:nowrap }
 
-    /* ── Employee capacity ── */
-    .emp-card { background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px }
-    .emp-card h3 { font-size:0.82rem;font-weight:700;color:var(--text-primary);margin:0 0 12px;display:flex;align-items:center;gap:6px }
-    .emp-item { display:flex;align-items:center;gap:10px;padding:6px 0;font-size:0.78rem }
-    .emp-item .avatar { width:24px;height:24px;border-radius:50%;background:var(--role-accent);color:#fff;font-size:0.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0 }
-    .emp-item .emp-bar-wrap { flex:1;height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden }
-    .emp-item .emp-bar-fill { height:100%;border-radius:3px;background:var(--role-accent);transition:width .4s }
-    .emp-item .emp-count { font-size:0.65rem;font-weight:600;color:var(--text-secondary);min-width:24px;text-align:right }
-
     /* ── Zoom controls ── */
     .zoom-bar { display:flex;gap:4px;margin-bottom:16px }
     .zoom-btn { padding:5px 14px;font-size:0.72rem;font-weight:600;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-primary);color:var(--text-secondary);cursor:pointer;transition:all .12s }
@@ -145,14 +123,7 @@ $stage_order = [
     .stage-empty { display:flex;border-bottom:1px solid var(--border-color);min-height:60px }
     .stage-empty .empty-msg { width:280px;min-width:280px;padding:16px 14px;font-size:0.72rem;color:var(--text-tertiary);border-right:1px solid var(--border-color);display:flex;align-items:center;justify-content:center }
 
-    /* ── Stage dot legend (in sidebar) ── */
-    .legend-card { background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px }
-    .legend-card h3 { font-size:0.82rem;font-weight:700;color:var(--text-primary);margin:0 0 10px;display:flex;align-items:center;gap:6px }
-    .legend-item { display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.7rem;color:var(--text-secondary) }
-    .legend-dot { width:10px;height:10px;border-radius:3px;flex-shrink:0 }
-
-    /* ── KPI row override for tighter spacing ── */
-    .ops-kpi { margin-bottom:16px }
+    /* ── KPI row spacing ── */
   </style>
 </head>
 <body data-role="admin">
@@ -160,13 +131,13 @@ $stage_order = [
   <?php render_role_sidebar($pdo); ?>
   <div class="dash-main">
 <?php
-$kpiRow = '<div class="ops-kpi">' . renderKPIRow([
+$kpiRow = renderKPIRow([
   ['label' => 'Active Orders', 'value' => (string)$stats['total_active'], 'icon' => 'fas fa-tasks', 'accent' => 'blue'],
   ['label' => 'Overdue', 'value' => (string)$stats['overdue'], 'icon' => 'fas fa-exclamation-triangle', 'accent' => 'red'],
   ['label' => 'Completed (7d)', 'value' => (string)$stats['completed_week'], 'icon' => 'fas fa-check-circle', 'accent' => 'green'],
   ['label' => 'In QC', 'value' => (string)$stats['in_qc'], 'icon' => 'fas fa-search', 'accent' => 'amber'],
   ['label' => 'Avg. Lead Time', 'value' => (string)$stats['avg_lead'] . 'd', 'icon' => 'fas fa-clock', 'accent' => 'purple'],
-]) . '</div>';
+]);
 
 // ── Build timeline ──
 ob_start(); ?>
@@ -258,13 +229,13 @@ ob_start(); ?>
           <div class="top-row">
             <a href="view_order.php?id=<?= $o['order_id'] ?>" class="order-id">#ORD-<?= $o['order_id'] ?></a>
             <?php if (strtolower($priority) === 'urgent'): ?>
-            <span class="priority-badge urgent">Urgent</span>
+            <span class="priority-badge priority-badge-urgent">Urgent</span>
             <?php elseif (strtolower($priority) === 'high'): ?>
-            <span class="priority-badge high">High</span>
+            <span class="priority-badge priority-badge-high">High</span>
             <?php elseif (strtolower($priority) === 'medium'): ?>
-            <span class="priority-badge medium">Medium</span>
+            <span class="priority-badge priority-badge-medium">Medium</span>
             <?php elseif (strtolower($priority) === 'low'): ?>
-            <span class="priority-badge low">Low</span>
+            <span class="priority-badge priority-badge-low">Low</span>
             <?php endif; ?>
           </div>
           <div class="meta">
@@ -296,31 +267,10 @@ ob_start(); ?>
 </div>
 <?php $timelineHtml = ob_get_clean();
 
-// ── Employee capacity sidebar ──
-$empHtml = '<div class="emp-card"><h3><i class="fas fa-users" style="color:var(--role-accent)"></i> Employee Capacity</h3>';
-if (empty($empLoad)):
-  $empHtml .= '<p style="font-size:0.75rem;color:var(--text-tertiary);text-align:center;padding:12px 0;margin:0">No active assignments</p>';
-else:
-  foreach ($empLoad as $e):
-    $pct = round(($e['cnt'] / $maxEmpLoad) * 100);
-    $initial = substr($e['full_name'], 0, 1);
-    $empHtml .= '<div class="emp-item"><span class="avatar">' . htmlspecialchars($initial) . '</span><span style="flex:1;font-size:0.72rem;color:var(--text-primary)">' . htmlspecialchars($e['full_name']) . '</span><div class="emp-bar-wrap"><div class="emp-bar-fill" style="width:' . $pct . '%"></div></div><span class="emp-count">' . $e['cnt'] . '</span></div>';
-  endforeach;
-endif;
-$empHtml .= '</div>';
-
-// ── Legend sidebar ──
-$legendHtml = '<div class="legend-card"><h3><i class="fas fa-palette" style="color:var(--role-accent)"></i> Stage Colors</h3>';
-foreach ($stage_order as $stg):
-  $cfg = $STAGE_CONFIG[$stg] ?? ['label' => $stg, 'color' => '#6b7280'];
-  $legendHtml .= '<div class="legend-item"><span class="legend-dot" style="background:' . $cfg['color'] . '"></span>' . htmlspecialchars($cfg['label'] ?? $stg) . '</div>';
-endforeach;
-$legendHtml .= '</div>';
-
 // ── Combine ──
 $zoomBar = '<div class="zoom-bar" id="zoomBar"><button class="zoom-btn active" data-zoom="day">Day</button><button class="zoom-btn" data-zoom="week">Week</button><button class="zoom-btn" data-zoom="month">Month</button></div>';
 
-$workspace = $alertsHtml . '<div class="ops-layout"><div class="ops-main">' . $zoomBar . $timelineHtml . '</div><div class="ops-sidebar">' . $empHtml . $legendHtml . '</div></div>'
+$workspace = $alertsHtml . $zoomBar . $timelineHtml
   . '<script>
 document.addEventListener(\'DOMContentLoaded\', function() {
   var zoomBtns = document.querySelectorAll(\'.zoom-btn\');
@@ -352,3 +302,7 @@ echo renderDashboardShell(
   $workspace
 );
 ?>
+</div>
+</div>
+</body>
+</html>
